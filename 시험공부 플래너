@@ -1,1 +1,607 @@
-https://www.figma.com/make/vv0n8FQnerd824EPtZyHGJ/%EC%8B%9C%ED%97%98%EA%B3%B5%EB%B6%80-%ED%94%8C%EB%9E%98%EB%84%88?fullscreen=1&t=kOOAqZpWkGSTfVPv-1&code-node-id=0-9
+import tkinter as tk
+from tkinter import ttk, messagebox
+import calendar
+from datetime import date, datetime
+ 
+# ───────────────────────────────────────────────
+# 상수
+# ───────────────────────────────────────────────
+BASE_SCORE   = 10
+WEAK_WEIGHT  = 3
+FOCUS_WEIGHT = 5
+MATH_BONUS   = 3
+ 
+COLORS = [
+    "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6",
+    "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1",
+]
+ 
+WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"]
+ 
+# ───────────────────────────────────────────────
+# 데이터 저장소
+# ───────────────────────────────────────────────
+subjects       = []   # {"id", "name", "isWeak", "isFocus", "customWeight"}
+scores         = []   # {"name", "score", "percentage", "color"}
+study_sessions = []   # {"id", "subjectName", "duration", "date", "color"}
+ 
+# ───────────────────────────────────────────────
+# 루트 윈도우
+# ───────────────────────────────────────────────
+root = tk.Tk()
+root.title("📚 시험공부 플래너")
+root.geometry("1100x800")
+root.configure(bg="#eef2ff")
+ 
+# 스크롤 가능한 메인 캔버스
+main_canvas = tk.Canvas(root, bg="#eef2ff", highlightthickness=0)
+scrollbar   = ttk.Scrollbar(root, orient="vertical", command=main_canvas.yview)
+main_canvas.configure(yscrollcommand=scrollbar.set)
+scrollbar.pack(side="right", fill="y")
+main_canvas.pack(side="left", fill="both", expand=True)
+ 
+main_frame = tk.Frame(main_canvas, bg="#eef2ff")
+main_canvas_window = main_canvas.create_window((0, 0), window=main_frame, anchor="nw")
+ 
+def _on_frame_configure(e):
+    main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+ 
+def _on_canvas_configure(e):
+    main_canvas.itemconfig(main_canvas_window, width=e.width)
+ 
+main_frame.bind("<Configure>", _on_frame_configure)
+main_canvas.bind("<Configure>", _on_canvas_configure)
+ 
+def _on_mousewheel(e):
+    main_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+ 
+main_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+ 
+# ───────────────────────────────────────────────
+# 헤더
+# ───────────────────────────────────────────────
+header = tk.Frame(main_frame, bg="#eef2ff")
+header.pack(fill="x", padx=20, pady=(20, 10))
+tk.Label(header, text="📚 시험공부 플래너",
+         font=("맑은 고딕", 22, "bold"), bg="#eef2ff", fg="#1e1b4b").pack()
+tk.Label(header, text="과목별 우선순위를 설정하고 효율적인 학습 계획을 세워보세요",
+         font=("맑은 고딕", 11), bg="#eef2ff", fg="#6b7280").pack()
+ 
+# ───────────────────────────────────────────────
+# 2열 레이아웃 (과목 관리 | 추천 비율)
+# ───────────────────────────────────────────────
+top_row = tk.Frame(main_frame, bg="#eef2ff")
+top_row.pack(fill="x", padx=20, pady=10)
+top_row.columnconfigure(0, weight=1)
+top_row.columnconfigure(1, weight=1)
+ 
+# ── 왼쪽: 과목 관리 ──
+left_card = tk.Frame(top_row, bg="white", relief="flat", bd=0,
+                     highlightthickness=1, highlightbackground="#e5e7eb")
+left_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=0)
+ 
+tk.Label(left_card, text="과목 관리", font=("맑은 고딕", 14, "bold"),
+         bg="white", fg="#1f2937").pack(anchor="w", padx=16, pady=(16, 8))
+ 
+# 입력 영역
+input_frame = tk.Frame(left_card, bg="white")
+input_frame.pack(fill="x", padx=16, pady=(0, 12))
+ 
+subject_entry_var = tk.StringVar()
+subject_entry = tk.Entry(input_frame, textvariable=subject_entry_var,
+                         font=("맑은 고딕", 11), relief="solid", bd=1)
+subject_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 8))
+subject_entry.insert(0, "과목명 입력 (예: 수학, 영어)")
+subject_entry.config(fg="gray")
+ 
+def on_entry_click(e):
+    if subject_entry_var.get() == "과목명 입력 (예: 수학, 영어)":
+        subject_entry.delete(0, "end")
+        subject_entry.config(fg="black")
+ 
+def on_focusout(e):
+    if subject_entry_var.get() == "":
+        subject_entry.insert(0, "과목명 입력 (예: 수학, 영어)")
+        subject_entry.config(fg="gray")
+ 
+subject_entry.bind("<FocusIn>", on_entry_click)
+subject_entry.bind("<FocusOut>", on_focusout)
+ 
+# 과목 목록 스크롤 영역
+subject_list_frame = tk.Frame(left_card, bg="white")
+subject_list_frame.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+ 
+subject_canvas = tk.Canvas(subject_list_frame, bg="white", highlightthickness=0, height=280)
+subject_scroll = ttk.Scrollbar(subject_list_frame, orient="vertical", command=subject_canvas.yview)
+subject_canvas.configure(yscrollcommand=subject_scroll.set)
+subject_scroll.pack(side="right", fill="y")
+subject_canvas.pack(side="left", fill="both", expand=True)
+ 
+subject_inner = tk.Frame(subject_canvas, bg="white")
+subject_canvas.create_window((0, 0), window=subject_inner, anchor="nw")
+subject_inner.bind("<Configure>",
+    lambda e: subject_canvas.configure(scrollregion=subject_canvas.bbox("all")))
+ 
+empty_label = tk.Label(subject_inner, text="📖 과목을 추가해주세요",
+                       font=("맑은 고딕", 11), bg="white", fg="#9ca3af")
+empty_label.pack(pady=40)
+ 
+calc_btn = tk.Button(left_card, text="우선순위 계산하기",
+                     font=("맑은 고딕", 12, "bold"),
+                     bg="#4f46e5", fg="white", relief="flat",
+                     activebackground="#4338ca", cursor="hand2",
+                     padx=16, pady=10)
+calc_btn.pack(fill="x", padx=16, pady=(0, 16))
+ 
+# ── 오른쪽: 추천 비율 ──
+right_card = tk.Frame(top_row, bg="white", relief="flat", bd=0,
+                      highlightthickness=1, highlightbackground="#e5e7eb")
+right_card.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=0)
+ 
+tk.Label(right_card, text="학습 추천 비율", font=("맑은 고딕", 14, "bold"),
+         bg="white", fg="#1f2937").pack(anchor="w", padx=16, pady=(16, 8))
+ 
+score_placeholder = tk.Label(right_card,
+    text="🎯 우선순위를 계산해주세요",
+    font=("맑은 고딕", 11), bg="white", fg="#9ca3af")
+score_placeholder.pack(expand=True, pady=80)
+ 
+score_inner = tk.Frame(right_card, bg="white")
+ 
+# 점수 계산 방식 안내
+info_frame = tk.Frame(right_card, bg="#eff6ff", relief="flat")
+info_label = tk.Label(info_frame,
+    text=(f"📊 점수 계산 방식\n"
+          f"  • 기본 점수: {BASE_SCORE}점\n"
+          f"  • 수학 보너스: +{MATH_BONUS}점\n"
+          f"  • 취약 과목: +{WEAK_WEIGHT}점\n"
+          f"  • 집중 관리: +{FOCUS_WEIGHT}점\n"
+          f"  • 사용자 지정: 0~20점"),
+    font=("맑은 고딕", 10), bg="#eff6ff", fg="#374151",
+    justify="left")
+info_label.pack(padx=12, pady=10)
+ 
+# ───────────────────────────────────────────────
+# 달력 카드
+# ───────────────────────────────────────────────
+cal_card = tk.Frame(main_frame, bg="white", relief="flat", bd=0,
+                    highlightthickness=1, highlightbackground="#e5e7eb")
+cal_card.pack(fill="x", padx=20, pady=(0, 20))
+ 
+cal_header_row = tk.Frame(cal_card, bg="white")
+cal_header_row.pack(fill="x", padx=16, pady=(16, 4))
+tk.Label(cal_header_row, text="🗓 학습 계획 달력",
+         font=("맑은 고딕", 14, "bold"), bg="white", fg="#1f2937").pack(side="left")
+ 
+# 월 이동
+nav_frame = tk.Frame(cal_card, bg="white")
+nav_frame.pack(pady=(0, 8))
+ 
+current_year  = datetime.today().year
+current_month = datetime.today().month
+cal_year_var  = tk.IntVar(value=current_year)
+cal_month_var = tk.IntVar(value=current_month)
+cal_label_var = tk.StringVar()
+ 
+selected_date_var = tk.StringVar(value="")
+cal_grid_frame = tk.Frame(cal_card, bg="white")
+cal_grid_frame.pack(padx=16, pady=(0, 8))
+ 
+session_detail_frame = tk.Frame(cal_card, bg="white")
+session_detail_frame.pack(fill="x", padx=16, pady=(0, 16))
+ 
+# 세션 추가 폼
+add_session_frame = tk.Frame(cal_card, bg="white")
+ 
+def render_calendar():
+    for w in cal_grid_frame.winfo_children():
+        w.destroy()
+ 
+    y = cal_year_var.get()
+    m = cal_month_var.get()
+    cal_label_var.set(f"{y}년 {m}월")
+ 
+    for i, d in enumerate(WEEKDAYS):
+        color = "#ef4444" if i == 0 else "#374151"
+        tk.Label(cal_grid_frame, text=d, font=("맑은 고딕", 10, "bold"),
+                 bg="white", fg=color, width=7).grid(row=0, column=i, pady=4)
+ 
+    first_weekday = calendar.monthrange(y, m)[0]
+    first_weekday = (first_weekday + 1) % 7  # 월요일=0 → 일요일=0 으로
+    days_in_month = calendar.monthrange(y, m)[1]
+    today = date.today()
+ 
+    col, row = first_weekday, 1
+    for day_num in range(1, days_in_month + 1):
+        d_obj = date(y, m, day_num)
+        d_str = d_obj.isoformat()
+ 
+        sessions_today = [s for s in study_sessions if s["date"] == d_str]
+        total_min = sum(s["duration"] for s in sessions_today)
+ 
+        is_today    = (d_obj == today)
+        is_selected = (selected_date_var.get() == d_str)
+ 
+        bg = "#eef2ff" if is_selected else ("#fef9c3" if is_today else "white")
+        border_color = "#4f46e5" if is_selected else ("#f59e0b" if is_today else "#e5e7eb")
+ 
+        cell = tk.Frame(cal_grid_frame, bg=bg, width=90, height=72,
+                        highlightthickness=1, highlightbackground=border_color)
+        cell.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+        cell.grid_propagate(False)
+ 
+        num_color = "#2563eb" if is_today else "#374151"
+        tk.Label(cell, text=str(day_num), font=("맑은 고딕", 9, "bold"),
+                 bg=bg, fg=num_color).pack(anchor="nw", padx=4, pady=2)
+ 
+        for s in sessions_today[:2]:
+            c = s.get("color", "#3b82f6")
+            tk.Label(cell, text=s["subjectName"],
+                     font=("맑은 고딕", 7), bg=c+"33", fg=c,
+                     relief="flat").pack(fill="x", padx=2)
+ 
+        if total_min > 0:
+            tk.Label(cell, text=f"⏱ {total_min//60}h{total_min%60:02d}m",
+                     font=("맑은 고딕", 7), bg=bg, fg="#6b7280").pack(anchor="sw", padx=2)
+ 
+        def on_click(e, ds=d_str):
+            selected_date_var.set(ds)
+            render_calendar()
+            render_session_detail()
+ 
+        cell.bind("<Button-1>", on_click)
+        for child in cell.winfo_children():
+            child.bind("<Button-1>", on_click)
+ 
+        col += 1
+        if col == 7:
+            col = 0
+            row += 1
+ 
+tk.Button(nav_frame, text="◀", font=("맑은 고딕", 12),
+          bg="white", fg="#374151", relief="flat", cursor="hand2",
+          command=lambda: (
+              cal_month_var.set(cal_month_var.get() - 1) if cal_month_var.get() > 1
+              else (cal_year_var.set(cal_year_var.get() - 1), cal_month_var.set(12)),
+              render_calendar()
+          )).pack(side="left", padx=8)
+ 
+tk.Label(nav_frame, textvariable=cal_label_var,
+         font=("맑은 고딕", 13, "bold"), bg="white", fg="#1f2937",
+         width=12).pack(side="left")
+ 
+tk.Button(nav_frame, text="▶", font=("맑은 고딕", 12),
+          bg="white", fg="#374151", relief="flat", cursor="hand2",
+          command=lambda: (
+              cal_month_var.set(cal_month_var.get() + 1) if cal_month_var.get() < 12
+              else (cal_year_var.set(cal_year_var.get() + 1), cal_month_var.set(1)),
+              render_calendar()
+          )).pack(side="left", padx=8)
+ 
+# ───────────────────────────────────────────────
+# 세션 상세 / 추가
+# ───────────────────────────────────────────────
+def render_session_detail():
+    for w in session_detail_frame.winfo_children():
+        w.destroy()
+    for w in add_session_frame.winfo_children():
+        w.destroy()
+ 
+    ds = selected_date_var.get()
+    if not ds:
+        return
+ 
+    tk.Label(session_detail_frame,
+             text=f"📅 {ds} 학습 기록",
+             font=("맑은 고딕", 12, "bold"), bg="white", fg="#1f2937"
+             ).pack(anchor="w", pady=(8, 4))
+ 
+    sessions_today = [s for s in study_sessions if s["date"] == ds]
+ 
+    for s in sessions_today:
+        row_f = tk.Frame(session_detail_frame, bg=s.get("color","#3b82f6")+"18",
+                         relief="flat")
+        row_f.pack(fill="x", pady=2, padx=4)
+        tk.Label(row_f, text=f"● {s['subjectName']}  {s['duration']}분",
+                 font=("맑은 고딕", 10), bg=row_f["bg"], fg="#1f2937"
+                 ).pack(side="left", padx=10, pady=6)
+ 
+        def make_remove(sid=s["id"]):
+            def remove():
+                study_sessions[:] = [x for x in study_sessions if x["id"] != sid]
+                render_calendar()
+                render_session_detail()
+            return remove
+ 
+        tk.Button(row_f, text="✕", font=("맑은 고딕", 9),
+                  bg=row_f["bg"], fg="#ef4444", relief="flat",
+                  cursor="hand2", command=make_remove()
+                  ).pack(side="right", padx=8)
+ 
+    # 추가 버튼 또는 폼
+    if not scores:
+        tk.Label(session_detail_frame,
+                 text="먼저 우선순위를 계산해주세요",
+                 font=("맑은 고딕", 10), bg="white", fg="#9ca3af"
+                 ).pack(pady=6)
+        return
+ 
+    def show_add_form():
+        add_session_frame.pack(fill="x", padx=16, pady=(0, 12))
+        for w in add_session_frame.winfo_children():
+            w.destroy()
+ 
+        form = tk.Frame(add_session_frame, bg="#f9fafb",
+                        highlightthickness=1, highlightbackground="#d1d5db")
+        form.pack(fill="x", pady=4)
+ 
+        # 과목 선택
+        tk.Label(form, text="과목 선택", font=("맑은 고딕", 10),
+                 bg="#f9fafb", fg="#374151").pack(anchor="w", padx=12, pady=(10, 2))
+ 
+        subject_names = [s["name"] for s in subjects]
+        sel_subject_var = tk.StringVar(value=subject_names[0] if subject_names else "")
+ 
+        subject_combo = ttk.Combobox(form, textvariable=sel_subject_var,
+                                     values=subject_names, state="readonly",
+                                     font=("맑은 고딕", 10))
+        subject_combo.pack(fill="x", padx=12, pady=(0, 8))
+ 
+        # 시간 입력
+        tk.Label(form, text="학습 시간 (분)", font=("맑은 고딕", 10),
+                 bg="#f9fafb", fg="#374151").pack(anchor="w", padx=12)
+ 
+        dur_frame = tk.Frame(form, bg="#f9fafb")
+        dur_frame.pack(fill="x", padx=12, pady=(2, 10))
+ 
+        dur_var = tk.StringVar(value="60")
+        dur_entry = tk.Entry(dur_frame, textvariable=dur_var,
+                             font=("맑은 고딕", 10), relief="solid", bd=1, width=10)
+        dur_entry.pack(side="left", ipady=4)
+ 
+        def apply_recommended():
+            name = sel_subject_var.get()
+            sc = next((s for s in scores if s["name"] == name), None)
+            if sc:
+                weekly_h = 20
+                rec_min = round((sc["percentage"] / 100) * weekly_h * 60)
+                dur_var.set(str(rec_min))
+ 
+        tk.Button(dur_frame, text="추천값 적용", font=("맑은 고딕", 9),
+                  bg="#e0e7ff", fg="#4f46e5", relief="flat",
+                  cursor="hand2", command=apply_recommended
+                  ).pack(side="left", padx=8, ipady=4)
+ 
+        # 추가/취소
+        btn_row = tk.Frame(form, bg="#f9fafb")
+        btn_row.pack(fill="x", padx=12, pady=(0, 10))
+ 
+        def confirm_add():
+            name = sel_subject_var.get()
+            dur  = dur_var.get()
+            if not name or not dur:
+                return
+            sc = next((s for s in scores if s["name"] == name), None)
+            study_sessions.append({
+                "id": str(datetime.now().timestamp()),
+                "subjectName": name,
+                "duration": int(dur),
+                "date": ds,
+                "color": sc["color"] if sc else "#3b82f6",
+            })
+            render_calendar()
+            render_session_detail()
+ 
+        tk.Button(btn_row, text="추가", font=("맑은 고딕", 10, "bold"),
+                  bg="#4f46e5", fg="white", relief="flat",
+                  cursor="hand2", command=confirm_add
+                  ).pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 4))
+ 
+        tk.Button(btn_row, text="취소", font=("맑은 고딕", 10),
+                  bg="#e5e7eb", fg="#374151", relief="flat",
+                  cursor="hand2",
+                  command=lambda: add_session_frame.pack_forget()
+                  ).pack(side="left", fill="x", expand=True, ipady=6)
+ 
+    tk.Button(session_detail_frame, text="+ 학습 계획 추가",
+              font=("맑은 고딕", 10), bg="white", fg="#4f46e5",
+              relief="solid", bd=1, cursor="hand2",
+              command=show_add_form
+              ).pack(fill="x", pady=(4, 0))
+ 
+# ───────────────────────────────────────────────
+# 과목 목록 렌더링
+# ───────────────────────────────────────────────
+def render_subjects():
+    for w in subject_inner.winfo_children():
+        w.destroy()
+ 
+    if not subjects:
+        tk.Label(subject_inner, text="📖 과목을 추가해주세요",
+                 font=("맑은 고딕", 11), bg="white", fg="#9ca3af"
+                 ).pack(pady=40)
+        return
+ 
+    for s in subjects:
+        card = tk.Frame(subject_inner, bg="white",
+                        highlightthickness=1, highlightbackground="#e5e7eb")
+        card.pack(fill="x", pady=4)
+ 
+        top = tk.Frame(card, bg="white")
+        top.pack(fill="x", padx=10, pady=(8, 4))
+        tk.Label(top, text=s["name"], font=("맑은 고딕", 11, "bold"),
+                 bg="white", fg="#1f2937").pack(side="left")
+ 
+        def make_remove(sid=s["id"]):
+            def remove():
+                subjects[:] = [x for x in subjects if x["id"] != sid]
+                render_subjects()
+            return remove
+ 
+        tk.Button(top, text="🗑", font=("맑은 고딕", 10),
+                  bg="white", fg="#ef4444", relief="flat",
+                  cursor="hand2", command=make_remove()
+                  ).pack(side="right")
+ 
+        checks = tk.Frame(card, bg="white")
+        checks.pack(fill="x", padx=10, pady=(0, 4))
+ 
+        weak_var = tk.BooleanVar(value=s["isWeak"])
+        focus_var = tk.BooleanVar(value=s["isFocus"])
+ 
+        def make_toggle_weak(sid=s["id"], var=weak_var):
+            def toggle():
+                for x in subjects:
+                    if x["id"] == sid:
+                        x["isWeak"] = var.get()
+            return toggle
+ 
+        def make_toggle_focus(sid=s["id"], var=focus_var):
+            def toggle():
+                for x in subjects:
+                    if x["id"] == sid:
+                        x["isFocus"] = var.get()
+            return toggle
+ 
+        tk.Checkbutton(checks, text=f"⚠ 취약 과목 (+{WEAK_WEIGHT}점)",
+                       variable=weak_var, command=make_toggle_weak(),
+                       font=("맑은 고딕", 9), bg="white", fg="#ef4444",
+                       activebackground="white", selectcolor="white"
+                       ).pack(side="left", padx=(0, 12))
+ 
+        tk.Checkbutton(checks, text=f"🎯 집중 관리 (+{FOCUS_WEIGHT}점)",
+                       variable=focus_var, command=make_toggle_focus(),
+                       font=("맑은 고딕", 9), bg="white", fg="#10b981",
+                       activebackground="white", selectcolor="white"
+                       ).pack(side="left")
+ 
+        # 사용자 지정 가중치
+        wt_row = tk.Frame(card, bg="white")
+        wt_row.pack(fill="x", padx=10, pady=(0, 8))
+        tk.Label(wt_row, text="사용자 가중치:",
+                 font=("맑은 고딕", 9), bg="white", fg="#6b7280").pack(side="left")
+ 
+        cw_var = tk.StringVar(value=str(s["customWeight"]))
+        cw_entry = tk.Entry(wt_row, textvariable=cw_var, width=5,
+                            font=("맑은 고딕", 9), relief="solid", bd=1)
+        cw_entry.pack(side="left", padx=4, ipady=2)
+        tk.Label(wt_row, text="점 (0-20)",
+                 font=("맑은 고딕", 9), bg="white", fg="#9ca3af").pack(side="left")
+ 
+        def make_update_weight(sid=s["id"], var=cw_var):
+            def update(e=None):
+                try:
+                    val = max(0, min(20, int(var.get())))
+                except ValueError:
+                    val = 0
+                for x in subjects:
+                    if x["id"] == sid:
+                        x["customWeight"] = val
+            return update
+ 
+        cw_entry.bind("<FocusOut>", make_update_weight())
+        cw_entry.bind("<Return>",   make_update_weight())
+ 
+# ───────────────────────────────────────────────
+# 추천 비율 렌더링
+# ───────────────────────────────────────────────
+def render_scores():
+    for w in score_inner.winfo_children():
+        w.destroy()
+ 
+    if not scores:
+        return
+ 
+    score_placeholder.pack_forget()
+    info_frame.pack(fill="x", padx=16, pady=(0, 16))
+    score_inner.pack(fill="x", padx=16, pady=(0, 16))
+ 
+    for sc in scores:
+        row_f = tk.Frame(score_inner, bg="white")
+        row_f.pack(fill="x", pady=4)
+ 
+        tk.Label(row_f, text=f"■", font=("맑은 고딕", 12),
+                 bg="white", fg=sc["color"]).pack(side="left")
+        tk.Label(row_f, text=f" {sc['name']}",
+                 font=("맑은 고딕", 10, "bold"), bg="white", fg="#1f2937"
+                 ).pack(side="left")
+        tk.Label(row_f, text=f"{sc['percentage']:.1f}%  (점수: {sc['score']}점)",
+                 font=("맑은 고딕", 9), bg="white", fg="#6b7280"
+                 ).pack(side="right")
+ 
+        bar_bg = tk.Frame(score_inner, bg="#e5e7eb", height=8)
+        bar_bg.pack(fill="x", pady=(0, 6))
+        bar_bg.update_idletasks()
+ 
+        bar_w = int(bar_bg.winfo_width() * sc["percentage"] / 100)
+        bar = tk.Frame(bar_bg, bg=sc["color"], height=8, width=max(bar_w, 4))
+        bar.place(x=0, y=0, relheight=1, relwidth=sc["percentage"]/100)
+ 
+# ───────────────────────────────────────────────
+# 과목 추가 버튼 액션
+# ───────────────────────────────────────────────
+def add_subject():
+    name = subject_entry_var.get().strip()
+    if name and name != "과목명 입력 (예: 수학, 영어)":
+        subjects.append({
+            "id": str(datetime.now().timestamp()),
+            "name": name,
+            "isWeak": False,
+            "isFocus": False,
+            "customWeight": 0,
+        })
+        subject_entry.delete(0, "end")
+        render_subjects()
+ 
+subject_entry.bind("<Return>", lambda e: add_subject())
+ 
+add_btn = tk.Button(input_frame, text="+ 추가",
+                    font=("맑은 고딕", 10, "bold"),
+                    bg="#2563eb", fg="white", relief="flat",
+                    activebackground="#1d4ed8", cursor="hand2",
+                    command=add_subject, padx=12, pady=6)
+add_btn.pack(side="left")
+ 
+# ───────────────────────────────────────────────
+# 우선순위 계산 버튼 액션
+# ───────────────────────────────────────────────
+def calculate_priorities():
+    if not subjects:
+        messagebox.showwarning("알림", "과목을 먼저 추가해주세요!")
+        return
+ 
+    calculated = []
+    for i, s in enumerate(subjects):
+        score = BASE_SCORE
+        if "수학" in s["name"]:
+            score += MATH_BONUS
+        if s["isWeak"]:
+            score += WEAK_WEIGHT
+        if s["isFocus"]:
+            score += FOCUS_WEIGHT
+        score += s["customWeight"]
+        calculated.append({
+            "name": s["name"],
+            "score": score,
+            "percentage": 0,
+            "color": COLORS[i % len(COLORS)],
+        })
+ 
+    total = sum(c["score"] for c in calculated)
+    scores.clear()
+    for c in calculated:
+        c["percentage"] = (c["score"] / total) * 100
+        scores.append(c)
+ 
+    render_scores()
+    messagebox.showinfo("완료", "우선순위 계산이 완료되었습니다! ✅")
+ 
+calc_btn.config(command=calculate_priorities)
+ 
+# ───────────────────────────────────────────────
+# 초기 렌더
+# ───────────────────────────────────────────────
+render_subjects()
+render_calendar()
+ 
+root.mainloop()
