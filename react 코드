@@ -1,0 +1,739 @@
+import { useState } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Plus, Trash2, BookOpen, AlertCircle, Target, Calendar as CalendarIcon, X, Clock, TrendingUp } from 'lucide-react';
+import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+
+// Types
+interface Subject {
+  id: string;
+  name: string;
+  isWeak: boolean;
+  isFocus: boolean;
+  customWeight: number;
+}
+
+interface SubjectScore {
+  name: string;
+  score: number;
+  percentage: number;
+  color: string;
+}
+
+interface StudySession {
+  id: string;
+  subjectName: string;
+  duration: number;
+  date: Date;
+  color: string;
+}
+
+// Constants
+const BASE_SCORE = 10;
+const WEAK_WEIGHT = 3;
+const FOCUS_WEIGHT = 5;
+const MATH_BONUS = 3;
+
+const COLORS = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+];
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// StudyPlanner Component
+function StudyPlanner({ 
+  subjects, 
+  setSubjects, 
+  scores, 
+  setScores 
+}: {
+  subjects: Subject[];
+  setSubjects: React.Dispatch<React.SetStateAction<Subject[]>>;
+  scores: SubjectScore[];
+  setScores: React.Dispatch<React.SetStateAction<SubjectScore[]>>;
+}) {
+  const [newSubjectName, setNewSubjectName] = useState('');
+
+  const addSubject = () => {
+    if (newSubjectName.trim()) {
+      const newSubject: Subject = {
+        id: Date.now().toString(),
+        name: newSubjectName.trim(),
+        isWeak: false,
+        isFocus: false,
+        customWeight: 0,
+      };
+      setSubjects([...subjects, newSubject]);
+      setNewSubjectName('');
+    }
+  };
+
+  const removeSubject = (id: string) => {
+    setSubjects(subjects.filter(s => s.id !== id));
+  };
+
+  const toggleWeak = (id: string) => {
+    setSubjects(subjects.map(s =>
+      s.id === id ? { ...s, isWeak: !s.isWeak } : s
+    ));
+  };
+
+  const toggleFocus = (id: string) => {
+    setSubjects(subjects.map(s =>
+      s.id === id ? { ...s, isFocus: !s.isFocus } : s
+    ));
+  };
+
+  const updateCustomWeight = (id: string, weight: number) => {
+    setSubjects(subjects.map(s =>
+      s.id === id ? { ...s, customWeight: Math.max(0, weight) } : s
+    ));
+  };
+
+  const calculatePriorities = () => {
+    if (subjects.length === 0) return;
+
+    const calculatedScores = subjects.map((subject, index) => {
+      let score = BASE_SCORE;
+      if (subject.name.includes('수학')) score += MATH_BONUS;
+      if (subject.isWeak) score += WEAK_WEIGHT;
+      if (subject.isFocus) score += FOCUS_WEIGHT;
+      score += subject.customWeight;
+
+      return {
+        name: subject.name,
+        score,
+        percentage: 0,
+        color: COLORS[index % COLORS.length],
+      };
+    });
+
+    const totalScore = calculatedScores.reduce((sum, s) => sum + s.score, 0);
+
+    const scoresWithPercentage = calculatedScores.map(s => ({
+      ...s,
+      percentage: (s.score / totalScore) * 100,
+    }));
+
+    setScores(scoresWithPercentage);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      addSubject();
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">과목 관리</h2>
+
+        <div className="flex gap-2 mb-6">
+          <input
+            type="text"
+            value={newSubjectName}
+            onChange={(e) => setNewSubjectName(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="과목명 입력 (예: 수학, 영어)"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={addSubject}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            추가
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {subjects.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>과목을 추가해주세요</p>
+            </div>
+          ) : (
+            subjects.map((subject) => (
+              <div
+                key={subject.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-medium text-gray-800">{subject.name}</span>
+                  <button
+                    onClick={() => removeSubject(subject.id)}
+                    className="text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={subject.isWeak}
+                        onChange={() => toggleWeak(subject.id)}
+                        className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
+                      />
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm text-gray-700">취약 과목 (+{WEAK_WEIGHT}점)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={subject.isFocus}
+                        onChange={() => toggleFocus(subject.id)}
+                        className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                      />
+                      <Target className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-gray-700">집중 관리 (+{FOCUS_WEIGHT}점)</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700 whitespace-nowrap">사용자 지정 가중치:</label>
+                    <input
+                      type="number"
+                      value={subject.customWeight || 0}
+                      onChange={(e) => updateCustomWeight(subject.id, parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="20"
+                      className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    />
+                    <span className="text-xs text-gray-500">점 (0-20)</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {subjects.length > 0 && (
+          <button
+            onClick={calculatePriorities}
+            className="w-full mt-6 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+          >
+            우선순위 계산하기
+          </button>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">학습 추천 비율</h2>
+
+        {scores.length === 0 ? (
+          <div className="flex items-center justify-center h-96 text-gray-400">
+            <div className="text-center">
+              <Target className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>우선순위를 계산해주세요</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-6">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={scores}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="percentage"
+                  >
+                    {scores.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="space-y-3">
+              {scores.map((subject, index) => (
+                <div
+                  key={index}
+                  className="border-l-4 pl-4 py-2"
+                  style={{ borderColor: subject.color }}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-medium text-gray-800">{subject.name}</span>
+                    <span className="text-sm font-semibold text-gray-600">
+                      {subject.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${subject.percentage}%`,
+                        backgroundColor: subject.color,
+                      }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    우선순위 점수: {subject.score}점
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold text-gray-800 mb-2">📊 점수 계산 방식</h3>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li>• 기본 점수: {BASE_SCORE}점</li>
+                <li>• 수학 과목 보너스: +{MATH_BONUS}점</li>
+                <li>• 취약 과목 가산: +{WEAK_WEIGHT}점</li>
+                <li>• 집중 관리 가산: +{FOCUS_WEIGHT}점</li>
+                <li>• 사용자 지정 가중치: 0~20점</li>
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// StudyCalendar Component
+function StudyCalendar({ subjects, scores }: { subjects: Subject[]; scores: SubjectScore[] }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
+  const [isAddingSession, setIsAddingSession] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [duration, setDuration] = useState('60');
+  const [weeklyStudyHours, setWeeklyStudyHours] = useState(20);
+  const [showRecommendation, setShowRecommendation] = useState(false);
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days: (Date | null)[] = [];
+
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+
+    return days;
+  };
+
+  const getSessionsForDate = (date: Date | null) => {
+    if (!date) return [];
+    return studySessions.filter(session => isSameDay(session.date, date));
+  };
+
+  const getTotalHoursForDate = (date: Date | null) => {
+    if (!date) return 0;
+    return getSessionsForDate(date).reduce((sum, session) => sum + session.duration, 0) / 60;
+  };
+
+  const addStudySession = () => {
+    if (!selectedDate || !selectedSubject || !duration) return;
+
+    const scoreData = scores.find(s => s.name === selectedSubject);
+    const newSession: StudySession = {
+      id: Date.now().toString(),
+      subjectName: selectedSubject,
+      duration: parseInt(duration),
+      date: selectedDate,
+      color: scoreData?.color || '#3b82f6',
+    };
+
+    setStudySessions([...studySessions, newSession]);
+    setSelectedSubject('');
+    setDuration('60');
+    setIsAddingSession(false);
+  };
+
+  const removeSession = (id: string) => {
+    setStudySessions(studySessions.filter(s => s.id !== id));
+  };
+
+  const getWeeklyStats = () => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    const stats = subjects.map(subject => {
+      const totalMinutes = studySessions
+        .filter(session =>
+          session.subjectName === subject.name &&
+          weekDays.some(day => isSameDay(day, session.date))
+        )
+        .reduce((sum, session) => sum + session.duration, 0);
+
+      return {
+        name: subject.name,
+        hours: totalMinutes / 60,
+      };
+    });
+
+    return stats.filter(s => s.hours > 0);
+  };
+
+  const getRecommendedHours = (subjectName: string) => {
+    const scoreData = scores.find(s => s.name === subjectName);
+    if (!scoreData) return 0;
+    return (scoreData.percentage / 100) * weeklyStudyHours;
+  };
+
+  const getRecommendedMinutes = (subjectName: string) => {
+    return Math.round(getRecommendedHours(subjectName) * 60);
+  };
+
+  const applyRecommendedDuration = () => {
+    if (selectedSubject) {
+      setDuration(getRecommendedMinutes(selectedSubject).toString());
+    }
+  };
+
+  const days = getDaysInMonth(currentDate);
+  const weeklyStats = getWeeklyStats();
+
+  const previousMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+            <CalendarIcon className="w-6 h-6 text-indigo-600" />
+            학습 계획 달력
+          </h2>
+          <button
+            onClick={() => setShowRecommendation(!showRecommendation)}
+            className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+          >
+            {showRecommendation ? '추천 비율 숨기기' : '추천 비율 보기'}
+          </button>
+        </div>
+
+        {showRecommendation && scores.length > 0 && (
+          <div className="bg-indigo-50 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-800">주간 학습 목표 설정</h3>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">주당 총 학습 시간:</label>
+                <input
+                  type="number"
+                  value={weeklyStudyHours}
+                  onChange={(e) => setWeeklyStudyHours(Math.max(1, parseInt(e.target.value) || 1))}
+                  min="1"
+                  max="100"
+                  className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+                <span className="text-sm text-gray-700">시간</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {scores.map((score, index) => (
+                <div key={index} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: score.color }}
+                    />
+                    <span className="font-medium text-gray-700">{score.name}</span>
+                  </div>
+                  <span className="text-gray-600">
+                    {getRecommendedHours(score.name).toFixed(1)}h ({score.percentage.toFixed(1)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={previousMonth}
+          className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          ←
+        </button>
+        <h3 className="text-xl font-semibold text-gray-800">
+          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+        </h3>
+        <button
+          onClick={nextMonth}
+          className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          →
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {WEEKDAYS.map(day => (
+            <div key={day} className="text-center font-semibold text-gray-600 text-sm py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((day, index) => {
+            const sessions = getSessionsForDate(day);
+            const totalHours = getTotalHoursForDate(day);
+            const isSelected = day && selectedDate && isSameDay(day, selectedDate);
+            const isToday = day && isSameDay(day, new Date());
+
+            return (
+              <div
+                key={index}
+                onClick={() => day && setSelectedDate(day)}
+                className={`
+                  min-h-24 p-2 border rounded-lg cursor-pointer transition-all
+                  ${!day ? 'bg-gray-50 cursor-default' : 'hover:border-indigo-400'}
+                  ${isSelected ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200'}
+                  ${isToday ? 'ring-2 ring-blue-400' : ''}
+                `}
+              >
+                {day && (
+                  <>
+                    <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                      {day.getDate()}
+                    </div>
+                    {sessions.length > 0 && (
+                      <div className="space-y-1">
+                        {sessions.slice(0, 2).map(session => (
+                          <div
+                            key={session.id}
+                            className="text-xs px-1 py-0.5 rounded truncate"
+                            style={{ backgroundColor: session.color + '20', color: session.color }}
+                          >
+                            {session.subjectName}
+                          </div>
+                        ))}
+                        {sessions.length > 2 && (
+                          <div className="text-xs text-gray-500">+{sessions.length - 2}</div>
+                        )}
+                        <div className="text-xs text-gray-600 font-semibold flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {totalHours.toFixed(1)}h
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {selectedDate && (
+        <div className="border-t pt-4">
+          <h3 className="font-semibold text-gray-800 mb-3">
+            {format(selectedDate, 'yyyy년 M월 d일')}
+          </h3>
+
+          <div className="space-y-2 mb-4">
+            {getSessionsForDate(selectedDate).map(session => (
+              <div
+                key={session.id}
+                className="flex items-center justify-between p-3 rounded-lg"
+                style={{ backgroundColor: session.color + '10' }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: session.color }}
+                  />
+                  <span className="font-medium text-gray-800">{session.subjectName}</span>
+                  <span className="text-sm text-gray-600">{session.duration}분</span>
+                </div>
+                <button
+                  onClick={() => removeSession(session.id)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {!isAddingSession ? (
+            <button
+              onClick={() => scores.length > 0 && setIsAddingSession(true)}
+              disabled={scores.length === 0}
+              className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              학습 계획 추가
+            </button>
+          ) : (
+            <div className="border rounded-lg p-4 space-y-3">
+              <div>
+                <select
+                  value={selectedSubject}
+                  onChange={(e) => {
+                    setSelectedSubject(e.target.value);
+                    if (e.target.value && scores.length > 0) {
+                      setDuration(getRecommendedMinutes(e.target.value).toString());
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">과목 선택</option>
+                  {subjects.map(subject => {
+                    const scoreData = scores.find(s => s.name === subject.name);
+                    return (
+                      <option key={subject.id} value={subject.name}>
+                        {subject.name}
+                        {scoreData && ` - ${scoreData.percentage.toFixed(1)}% (추천: ${getRecommendedHours(subject.name).toFixed(1)}h/주)`}
+                      </option>
+                    );
+                  })}
+                </select>
+                {selectedSubject && scores.length > 0 && (
+                  <div className="mt-2 text-xs text-gray-600 flex items-center justify-between">
+                    <span>
+                      💡 주간 추천: {getRecommendedHours(selectedSubject).toFixed(1)}시간
+                      ({getRecommendedMinutes(selectedSubject)}분)
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="학습 시간 (분)"
+                    min="15"
+                    step="15"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  {selectedSubject && scores.length > 0 && (
+                    <button
+                      onClick={applyRecommendedDuration}
+                      className="px-3 py-2 text-sm bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors whitespace-nowrap"
+                    >
+                      추천값
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={addStudySession}
+                  disabled={!selectedSubject || !duration}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  추가
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingSession(false);
+                    setSelectedSubject('');
+                    setDuration('60');
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {weeklyStats.length > 0 && (
+        <div className="border-t pt-4 mt-4">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            이번 주 학습 현황
+          </h3>
+          <div className="space-y-2">
+            {weeklyStats.map((stat, index) => {
+              const recommended = getRecommendedHours(stat.name);
+              const percentage = recommended > 0 ? (stat.hours / recommended) * 100 : 0;
+
+              return (
+                <div key={index} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-700">{stat.name}</span>
+                    <span className="text-gray-600">
+                      {stat.hours.toFixed(1)}h / {recommended.toFixed(1)}h
+                      <span className={`ml-2 ${percentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                        ({percentage.toFixed(0)}%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        percentage >= 100 ? 'bg-green-500' : 'bg-orange-400'
+                      }`}
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {scores.length === 0 && (
+        <div className="text-center py-8 text-gray-400">
+          <CalendarIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>먼저 과목별 우선순위를 계산해주세요</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Main App Component
+export default function App() {
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [scores, setScores] = useState<SubjectScore[]>([]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2">
+            <BookOpen className="w-10 h-10 text-blue-600" />
+            시험공부 플래너
+          </h1>
+          <p className="text-gray-600">과목별 우선순위를 설정하고 효율적인 학습 계획을 세워보세요</p>
+        </div>
+
+        <StudyPlanner
+          subjects={subjects}
+          setSubjects={setSubjects}
+          scores={scores}
+          setScores={setScores}
+        />
+
+        <div className="mt-6">
+          <StudyCalendar subjects={subjects} scores={scores} />
+        </div>
+      </div>
+    </div>
+  );
+}
