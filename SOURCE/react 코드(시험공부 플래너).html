@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시험공부 플래너</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8" 
+      x-data="studyApp()" 
+      x-init="initData(); $watch('currentDate', value => updateCalendar())">
+
+    <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-2">
+                <i data-lucide="book-open" class="w-10 h-10 text-blue-600"></i>
+                시험공부 플래너
+            </h1>
+            <p class="text-gray-600">과목별 우선순위를 설정하고 효율적인 학습 계획을 세워보세요</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">과목 관리</h2>
+
+                <div class="flex gap-2 mb-6">
+                    <input
+                        type="text"
+                        x-model="newSubjectName"
+                        @keydown.enter="addSubject()"
+                        placeholder="과목명 입력 (예: 수학, 영어)"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                        @click="addSubject()"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        추가
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-if="subjects.length === 0">
+                        <div class="text-center py-8 text-gray-400">
+                            <i data-lucide="book-open" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                            <p>과목을 추가해주세요</p>
+                        </div>
+                    </template>
+
+                    <template x-for="subject in subjects" :key="subject.id">
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="font-medium text-gray-800" x-text="subject.name"></span>
+                                <button
+                                    @click="removeSubject(subject.id)"
+                                    class="text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+                                >
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex gap-4">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            x-model="subject.isWeak"
+                                            class="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
+                                        />
+                                        <i data-lucide="alert-circle" class="w-4 h-4 text-red-500"></i>
+                                        <span class="text-sm text-gray-700">취약 과목 (+3점)</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            x-model="subject.isFocus"
+                                            class="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+                                        />
+                                        <i data-lucide="target" class="w-4 h-4 text-green-500"></i>
+                                        <span class="text-sm text-gray-700">집중 관리 (+5점)</span>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-sm text-gray-700 whitespace-nowrap">사용자 지정 가중치:</label>
+                                    <input
+                                        type="number"
+                                        x-model.number="subject.customWeight"
+                                        min="0"
+                                        max="20"
+                                        class="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    />
+                                    <span class="text-xs text-gray-500">점 (0-20)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <template x-if="subjects.length > 0">
+                    <button
+                        @click="calculatePriorities()"
+                        class="w-full mt-6 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium cursor-pointer"
+                    >
+                        우선순위 계산하기
+                    </button>
+                </template>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">학습 추천 비율</h2>
+
+                <template x-if="scores.length === 0">
+                    <div class="flex items-center justify-center h-96 text-gray-400">
+                        <div class="text-center">
+                            <i data-lucide="target" class="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                            <p>우선순위를 계산해주세요</p>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="scores.length > 0">
+                    <div>
+                        <div class="mb-6 flex h-8 rounded-full overflow-hidden shadow-inner bg-gray-100">
+                            <template x-for="score in scores">
+                                <div :style="`width: ${score.percentage}%; background-color: ${score.color}`" 
+                                     class="h-full transition-all duration-500 first:rounded-l-full last:rounded-r-full"
+                                     :title="`${score.name}: ${score.percentage.toFixed(1)}%`"
+                                     x-show="score.percentage > 0">
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="space-y-3">
+                            <template x-for="(subject, index) in scores" :key="index">
+                                <div class="border-l-4 pl-4 py-2" :style="`border-color: ${subject.color}`">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="font-medium text-gray-800" x-text="subject.name"></span>
+                                        <span class="text-sm font-semibold text-gray-600" x-text="subject.percentage.toFixed(1) + '%'"></span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="h-2 rounded-full transition-all duration-500"
+                                             :style="`width: ${subject.percentage}%; background-color: ${subject.color}`">
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        우선순위 점수: <span x-text="subject.score"></span>점
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                            <h3 class="font-semibold text-gray-800 mb-2">📊 점수 계산 방식</h3>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>• 기본 점수: 10점</li>
+                                <li>• 수학 과목 보너스: +3점</li>
+                                <li>• 취약 과목 가산: +3점</li>
+                                <li>• 집중 관리 가산: +5점</li>
+                                <li>• 사용자 지정 가중치: 0~20점</li>
+                            </ul>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-semibold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="calendar" class="w-6 h-6 text-indigo-600"></i>
+                        학습 계획 달력
+                    </h2>
+                    <button
+                        @click="showRecommendation = !showRecommendation"
+                        class="text-sm text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                        x-text="showRecommendation ? '추천 비율 숨기기' : '추천 비율 보기'"
+                    ></button>
+                </div>
+
+                <div x-show="showRecommendation && scores.length > 0" x-cloak class="bg-indigo-50 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-gray-800">주간 학습 목표 설정</h3>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-700">주당 총 학습 시간:</label>
+                            <input
+                                type="number"
+                                x-model.number="weeklyStudyHours"
+                                min="1"
+                                max="100"
+                                class="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                            />
+                            <span class="text-sm text-gray-700">시간
