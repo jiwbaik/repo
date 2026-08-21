@@ -1,0 +1,1285 @@
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Trash2, BookOpen, AlertCircle, Target, Calendar as CalendarIcon, X, Clock, TrendingUp, Plus } from 'lucide-react';
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+function formatDate(date) {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+const BASE_SCORE = 10;
+const WEAK_WEIGHT = 3;
+const FOCUS_WEIGHT = 5;
+const MATH_BONUS = 3;
+
+const COLORS = [
+  '#1a2744', '#b8973a', '#2e4070', '#d4af60',
+  '#6b7280', '#4a5a7a', '#9c7a2e', '#7d8ba3',
+];
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function ThemeStyles() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+      .plnr-root {
+        --cream: #faf6ef;
+        --cream-dark: #f0e9dc;
+        --cream-mid: #f5f0e8;
+        --navy: #1a2744;
+        --navy-mid: #243257;
+        --navy-light: #2e4070;
+        --gold: #b8973a;
+        --gold-light: #d4af60;
+        --text: #1a2744;
+        --muted: #6b7280;
+        --white: #ffffff;
+        --border: rgba(26, 39, 68, 0.12);
+        --radius: 16px;
+        --shadow: 0 4px 24px rgba(26, 39, 68, 0.10);
+        --shadow-lg: 0 12px 48px rgba(26, 39, 68, 0.16);
+        font-family: 'Noto Sans KR', sans-serif;
+        background: var(--cream);
+        color: var(--text);
+        min-height: 100vh;
+        padding-bottom: 100px;
+      }
+      .plnr-root * { box-sizing: border-box; }
+
+      @keyframes plnrFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes plnrSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+      .plnr-hero {
+        background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 55%, var(--navy-light) 100%);
+        padding: 64px 24px 48px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .plnr-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 20% 80%, rgba(212, 165, 160, .15) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 20%, rgba(184, 151, 58, .10) 0%, transparent 50%);
+        pointer-events: none;
+      }
+      .plnr-hero-inner { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
+      .plnr-badge {
+        display: inline-block;
+        border: 1px solid rgba(184, 151, 58, .5);
+        color: var(--gold-light);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        padding: 6px 18px;
+        border-radius: 999px;
+        margin-bottom: 24px;
+      }
+      .plnr-title {
+        font-family: 'Noto Serif KR', serif;
+        font-size: clamp(26px, 5vw, 42px);
+        font-weight: 700;
+        color: var(--cream);
+        line-height: 1.3;
+        margin-bottom: 14px;
+      }
+      .plnr-title .accent {
+        background: linear-gradient(135deg, var(--gold-light), var(--gold));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .plnr-sub { font-size: 14px; color: rgba(250, 246, 239, .72); line-height: 1.7; }
+
+      .plnr-container { max-width: 860px; margin: 0 auto; padding: 32px 20px 20px; animation: plnrFadeIn .4s ease; }
+
+      .plnr-card {
+        background: var(--white);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 32px;
+        box-shadow: var(--shadow);
+        margin-bottom: 24px;
+      }
+      .plnr-card-header {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--cream-dark);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .plnr-input-row { display: flex; gap: 10px; margin-bottom: 24px; }
+      .plnr-input {
+        flex: 1;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 14px;
+        font-family: 'Noto Sans KR', sans-serif;
+        color: var(--text);
+      }
+      .plnr-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184, 151, 58, .12); }
+
+      .plnr-btn-primary {
+        padding: 12px 20px;
+        background: var(--navy);
+        color: var(--white);
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all .2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Noto Sans KR', sans-serif;
+      }
+      .plnr-btn-primary:hover:not(:disabled) { background: var(--navy-mid); transform: translateY(-2px); box-shadow: 0 8px 16px rgba(26, 39, 68, .2); }
+      .plnr-btn-primary:disabled { background: var(--muted); cursor: not-allowed; opacity: .5; }
+      .plnr-btn-primary.full { width: 100%; justify-content: center; padding: 14px; }
+
+      .plnr-btn-secondary {
+        padding: 12px 20px;
+        background: var(--cream-dark);
+        color: var(--text);
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all .2s;
+        font-family: 'Noto Sans KR', sans-serif;
+      }
+      .plnr-btn-secondary:hover { background: var(--cream-mid); }
+      .plnr-btn-secondary.full { width: 100%; }
+
+      .plnr-btn-gold {
+        padding: 10px 14px;
+        background: rgba(184, 151, 58, .10);
+        color: var(--gold);
+        border: 1px solid rgba(184, 151, 58, .3);
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .plnr-btn-gold:hover { background: rgba(184, 151, 58, .18); }
+
+      .plnr-subject-item {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 14px;
+        transition: all .3s cubic-bezier(.34, 1.56, .64, 1);
+        background: var(--white);
+      }
+      .plnr-subject-item:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--gold); }
+      .plnr-subject-name { font-family: 'Noto Serif KR', serif; font-weight: 600; color: var(--navy); font-size: 15px; }
+
+      .plnr-pill-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+      .plnr-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all .2s;
+        font-weight: 600;
+      }
+      .plnr-pill-weak { background: rgba(184, 151, 58, .08); color: var(--gold); border-color: rgba(184, 151, 58, .3); }
+      .plnr-pill-weak.active { background: var(--gold); color: var(--white); border-color: var(--gold); }
+      .plnr-pill-focus { background: rgba(26, 39, 68, .06); color: var(--navy); border-color: rgba(26, 39, 68, .2); }
+      .plnr-pill-focus.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+
+      .plnr-weight-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+      .plnr-weight-input { width: 64px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; }
+
+      .plnr-progress-track { width: 100%; background: var(--cream-dark); border-radius: 999px; height: 8px; overflow: hidden; }
+      .plnr-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
+
+      .plnr-info-box {
+        background: rgba(184, 151, 58, .08);
+        border-left: 3px solid var(--gold);
+        padding: 14px 16px;
+        border-radius: 0 10px 10px 0;
+        font-size: 13px;
+        color: var(--text);
+        margin-top: 24px;
+        line-height: 1.7;
+      }
+
+      .plnr-empty { text-align: center; padding: 56px 24px; color: var(--muted); }
+      .plnr-empty-emoji { font-size: 40px; margin-bottom: 12px; display: block; opacity: .6; }
+
+      .plnr-cal-controls { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+      .plnr-cal-nav-btn { padding: 8px 16px; background: var(--cream-mid); border: none; border-radius: 10px; cursor: pointer; color: var(--navy); font-weight: 700; transition: all .2s; }
+      .plnr-cal-nav-btn:hover { background: var(--cream-dark); }
+      .plnr-cal-month { font-family: 'Noto Serif KR', serif; font-size: 18px; font-weight: 700; color: var(--navy); }
+
+      .plnr-weekday-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 8px; }
+      .plnr-weekday-label { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); padding: 8px 0; }
+
+      .plnr-day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+      .plnr-day-cell {
+        min-height: 88px;
+        padding: 8px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all .2s;
+        background: var(--white);
+      }
+      .plnr-day-cell.empty { background: var(--cream-mid); cursor: default; border-color: transparent; }
+      .plnr-day-cell:not(.empty):hover { border-color: var(--gold); }
+      .plnr-day-cell.selected { border-color: var(--navy); background: rgba(26, 39, 68, .04); }
+      .plnr-day-cell.today { box-shadow: inset 0 0 0 2px var(--gold-light); }
+      .plnr-day-num { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+      .plnr-day-num.today { color: var(--gold); }
+      .plnr-session-tag { font-size: 10px; padding: 2px 6px; border-radius: 6px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+      .plnr-detail-header {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--navy);
+        margin-bottom: 16px;
+        padding-top: 20px;
+        border-top: 2px solid var(--cream-dark);
+      }
+      .plnr-session-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 10px; margin-bottom: 8px; }
+      .plnr-dash-btn {
+        width: 100%;
+        padding: 14px;
+        border: 2px dashed var(--border);
+        border-radius: 10px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all .2s;
+        font-family: 'Noto Sans KR', sans-serif;
+      }
+      .plnr-dash-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+      .plnr-dash-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+      .plnr-select {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 14px;
+        font-family: 'Noto Sans KR', sans-serif;
+        color: var(--text);
+        background: var(--white);
+      }
+      .plnr-select:focus, .plnr-input:focus { outline: none; border-color: var(--gold); }
+
+      .plnr-add-panel { border: 1px solid var(--border); border-radius: 14px; padding: 18px; background: var(--cream-mid); animation: plnrSlideUp .3s ease; }
+
+      .plnr-weekly-row { margin-bottom: 14px; }
+
+      .plnr-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--white);
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-around;
+        padding: 12px 0 22px;
+        z-index: 100;
+        max-width: 100%;
+      }
+      .plnr-nav-item {
+        flex: 1;
+        max-width: 200px;
+        text-align: center;
+        cursor: pointer;
+        padding: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        position: relative;
+        transition: all .2s;
+      }
+      .plnr-nav-item.active { color: var(--navy); }
+      .plnr-nav-item.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 3px;
+        height: 3px;
+        background: var(--gold);
+        border-radius: 50%;
+      }
+      .plnr-nav-emoji { font-size: 20px; margin-bottom: 4px; }
+
+      .plnr-guide-card {
+        background: var(--cream-mid);
+        border: 1px dashed rgba(184, 151, 58, .4);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 24px;
+      }
+      .plnr-guide-title {
+        display: flex; align-items: center; gap: 8px;
+        font-family: 'Noto Serif KR', serif;
+        font-weight: 700; color: var(--navy); font-size: 14px;
+        margin-bottom: 12px;
+      }
+      .plnr-guide-step {
+        display: flex; gap: 12px; align-items: flex-start;
+        font-size: 12.5px; color: var(--text); line-height: 1.6;
+        margin-bottom: 10px;
+      }
+      .plnr-guide-step:last-child { margin-bottom: 0; }
+      .plnr-guide-num {
+        flex-shrink: 0;
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        background: var(--gold);
+        color: var(--white);
+        font-size: 11px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .plnr-guide-link {
+        background: none; border: none; color: var(--gold);
+        font-size: 12px; font-weight: 700; cursor: pointer;
+        text-decoration: underline; padding: 0; font-family: 'Noto Sans KR', sans-serif;
+      }
+
+      .plnr-setup-row { margin-bottom: 20px; }
+      .plnr-setup-label {
+        font-size: 13px; font-weight: 700; color: var(--navy);
+        margin-bottom: 8px; display: block;
+      }
+      .plnr-weekday-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+      }
+      .plnr-weekday-input-item { text-align: center; }
+      .plnr-weekday-input-item label {
+        display: block; font-size: 11px; font-weight: 700;
+        color: var(--muted); margin-bottom: 6px;
+      }
+      .plnr-weekday-input-item.weekend label { color: var(--gold); }
+      .plnr-weekday-input-item input {
+        width: 100%; padding: 8px 4px; text-align: center;
+        border: 1px solid var(--border); border-radius: 8px;
+        font-size: 13px; font-family: 'Noto Sans KR', sans-serif;
+      }
+      .plnr-weekday-input-item input:focus { outline: none; border-color: var(--gold); }
+      .plnr-weekday-unit { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+      .plnr-dday-banner {
+        background: linear-gradient(120deg, var(--navy) 0%, var(--navy-light) 100%);
+        border-radius: 14px;
+        padding: 20px 24px;
+        color: var(--cream);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .plnr-dday-main { display: flex; align-items: baseline; gap: 10px; }
+      .plnr-dday-num {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 26px; font-weight: 700; color: var(--gold-light);
+      }
+      .plnr-dday-label { font-size: 12px; color: rgba(250,246,239,.75); }
+      .plnr-dday-total { font-size: 12px; color: rgba(250,246,239,.85); text-align: right; }
+      .plnr-dday-total strong { color: var(--gold-light); font-size: 14px; }
+
+      .plnr-day-cell.exam { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+      .plnr-day-cell.outside { opacity: .35; }
+      .plnr-exam-flag { font-size: 9px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+
+      .plnr-rec-strip { display: flex; height: 5px; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+      .plnr-rec-swatch-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding: 6px 0; }
+
+      @keyframes plnrPulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+      .plnr-timer-card {
+        background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 100%);
+        border-radius: var(--radius);
+        padding: 28px 24px;
+        margin-bottom: 24px;
+        color: var(--cream);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .plnr-timer-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 15% 15%, rgba(184, 151, 58, .12) 0%, transparent 55%);
+        pointer-events: none;
+      }
+      .plnr-timer-inner { position: relative; z-index: 1; }
+      .plnr-timer-title {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 14px; font-weight: 700;
+        color: var(--gold-light);
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .plnr-timer-live-dot {
+        display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+        background: #e0625a; animation: plnrPulse 1.2s infinite;
+      }
+      .plnr-timer-select {
+        width: 100%; max-width: 280px; margin: 0 auto 14px;
+        padding: 10px 12px; border-radius: 10px;
+        border: 1px solid rgba(250, 246, 239, .3);
+        background: rgba(250, 246, 239, .08);
+        color: var(--cream); font-size: 14px;
+        font-family: 'Noto Sans KR', sans-serif;
+        display: block;
+      }
+      .plnr-timer-select option { color: var(--navy); }
+      .plnr-timer-display {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 46px; font-weight: 700;
+        letter-spacing: 2px; color: var(--gold-light);
+        margin: 6px 0 18px;
+        font-variant-numeric: tabular-nums;
+      }
+      .plnr-timer-rec { font-size: 12px; color: rgba(250, 246, 239, .65); margin-top: -12px; margin-bottom: 18px; }
+      .plnr-timer-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .plnr-timer-btn {
+        padding: 12px 24px; border-radius: 999px; border: none;
+        font-weight: 700; font-size: 13.5px; cursor: pointer; transition: all .2s;
+        font-family: 'Noto Sans KR', sans-serif;
+      }
+      .plnr-timer-btn:disabled { opacity: .4; cursor: not-allowed; }
+      .plnr-timer-btn.start { background: var(--gold); color: var(--navy); }
+      .plnr-timer-btn.start:hover:not(:disabled) { background: var(--gold-light); transform: translateY(-2px); }
+      .plnr-timer-btn.pause { background: rgba(250, 246, 239, .15); color: var(--cream); border: 1px solid rgba(250, 246, 239, .3); }
+      .plnr-timer-btn.pause:hover:not(:disabled) { background: rgba(250, 246, 239, .25); }
+      .plnr-timer-btn.stop { background: var(--gold-light); color: var(--navy); }
+      .plnr-timer-btn.stop:hover:not(:disabled) { background: var(--gold); }
+      .plnr-timer-btn.reset { background: transparent; color: rgba(250, 246, 239, .55); text-decoration: underline; padding: 12px 8px; }
+      .plnr-timer-today {
+        margin-top: 20px; padding-top: 16px;
+        border-top: 1px solid rgba(250, 246, 239, .15);
+        font-size: 12.5px; color: rgba(250, 246, 239, .85);
+      }
+      .plnr-timer-today strong { color: var(--gold-light); font-size: 14px; }
+
+      .plnr-switch-row {
+        display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+        margin-top: 14px; padding-top: 14px;
+        border-top: 1px solid rgba(250, 246, 239, .12);
+      }
+      .plnr-switch-chip {
+        padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(250,246,239,.25);
+        background: rgba(250,246,239,.08); color: rgba(250,246,239,.75);
+        font-size: 12px; font-weight: 700; cursor: pointer;
+        font-family: 'Noto Sans KR', sans-serif; transition: all .18s;
+      }
+      .plnr-switch-chip:hover { background: rgba(250,246,239,.18); color: var(--cream); }
+      .plnr-switch-chip.active {
+        background: var(--gold); color: var(--navy);
+        border-color: var(--gold);
+      }
+      .plnr-switch-label {
+        font-size: 11px; color: rgba(250,246,239,.45); margin-bottom: 6px;
+        letter-spacing: .5px;
+      }
+
+      @keyframes plnrToastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes plnrToastOut { from { opacity: 1; } to { opacity: 0; } }
+      .plnr-toast {
+        position: fixed;
+        bottom: 88px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--navy);
+        color: var(--gold-light);
+        font-family: 'Noto Sans KR', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 10px 22px;
+        border-radius: 999px;
+        border: 1px solid rgba(212, 175, 96, .35);
+        box-shadow: 0 8px 24px rgba(26, 39, 68, .25);
+        z-index: 200;
+        animation: plnrToastIn .25s ease forwards;
+        white-space: nowrap;
+      }
+      .plnr-toast.out { animation: plnrToastOut .3s ease forwards; }
+    `}</style>
+  );
+}
+
+function ManagePanel({ subjects, setSubjects, scores, setScores }) {
+  const [newSubjectName, setNewSubjectName] = useState('');
+
+  const addSubject = () => {
+    if (newSubjectName.trim()) {
+      setSubjects([...subjects, {
+        id: Date.now().toString(),
+        name: newSubjectName.trim(),
+        isWeak: false,
+        isFocus: false,
+        customWeight: 0,
+      }]);
+      setNewSubjectName('');
+    }
+  };
+  const removeSubject = (id) => setSubjects(subjects.filter(s => s.id !== id));
+  const toggleWeak = (id) => setSubjects(subjects.map(s => s.id === id ? { ...s, isWeak: !s.isWeak } : s));
+  const toggleFocus = (id) => setSubjects(subjects.map(s => s.id === id ? { ...s, isFocus: !s.isFocus } : s));
+  const updateCustomWeight = (id, w) => setSubjects(subjects.map(s => s.id === id ? { ...s, customWeight: Math.max(0, w) } : s));
+
+  const calculatePriorities = () => {
+    if (subjects.length === 0) return;
+    const calc = subjects.map((subject, index) => {
+      let score = BASE_SCORE;
+      if (subject.name.includes('수학')) score += MATH_BONUS;
+      if (subject.isWeak) score += WEAK_WEIGHT;
+      if (subject.isFocus) score += FOCUS_WEIGHT;
+      score += subject.customWeight;
+      return { name: subject.name, score, percentage: 0, color: COLORS[index % COLORS.length] };
+    });
+    const total = calc.reduce((sum, s) => sum + s.score, 0);
+    setScores(calc.map(s => ({ ...s, percentage: (s.score / total) * 100 })));
+  };
+
+  const handleKeyPress = (e) => { if (e.key === 'Enter') addSubject(); };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+      <div className="plnr-card">
+        <div className="plnr-card-header"><BookOpen size={18} /> 과목 관리</div>
+
+        <div className="plnr-input-row">
+          <input
+            type="text"
+            value={newSubjectName}
+            onChange={(e) => setNewSubjectName(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="과목명 입력 (예: 수학, 영어)"
+            className="plnr-input"
+          />
+          <button onClick={addSubject} className="plnr-btn-primary">
+            <Plus size={16} /> 추가
+          </button>
+        </div>
+
+        {subjects.length === 0 ? (
+          <div className="plnr-empty">
+            <span className="plnr-empty-emoji">📖</span>
+            <p>과목을 추가해주세요</p>
+          </div>
+        ) : (
+          subjects.map((subject) => (
+            <div key={subject.id} className="plnr-subject-item">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span className="plnr-subject-name">{subject.name}</span>
+                <button onClick={() => removeSubject(subject.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <div className="plnr-pill-row">
+                <div className={`plnr-pill plnr-pill-weak ${subject.isWeak ? 'active' : ''}`} onClick={() => toggleWeak(subject.id)}>
+                  <AlertCircle size={13} /> 취약 과목 (+{WEAK_WEIGHT})
+                </div>
+                <div className={`plnr-pill plnr-pill-focus ${subject.isFocus ? 'active' : ''}`} onClick={() => toggleFocus(subject.id)}>
+                  <Target size={13} /> 집중 관리 (+{FOCUS_WEIGHT})
+                </div>
+              </div>
+              <div className="plnr-weight-row">
+                <span>사용자 지정 가중치:</span>
+                <input
+                  type="number"
+                  value={subject.customWeight || 0}
+                  onChange={(e) => updateCustomWeight(subject.id, parseInt(e.target.value) || 0)}
+                  min="0" max="20"
+                  className="plnr-weight-input"
+                />
+                <span>점 (0-20)</span>
+              </div>
+            </div>
+          ))
+        )}
+
+        {subjects.length > 0 && (
+          <button onClick={calculatePriorities} className="plnr-btn-primary full" style={{ marginTop: 8 }}>
+            우선순위 계산하기
+          </button>
+        )}
+      </div>
+
+      <div className="plnr-card">
+        <div className="plnr-card-header"><Target size={18} /> 학습 추천 비율</div>
+
+        {scores.length === 0 ? (
+          <div className="plnr-empty">
+            <span className="plnr-empty-emoji">🎯</span>
+            <p>우선순위를 계산해주세요</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 20 }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={scores}
+                    cx="50%" cy="50%"
+                    labelLine={false}
+                    label={({ name, percentage }) => `${name}: ${percentage.toFixed(1)}%`}
+                    outerRadius={95}
+                    dataKey="percentage"
+                  >
+                    {scores.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div>
+              {scores.map((subject, index) => (
+                <div key={index} style={{ borderLeft: `4px solid ${subject.color}`, paddingLeft: 14, paddingTop: 6, paddingBottom: 6, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span className="plnr-subject-name" style={{ fontSize: 14 }}>{subject.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>{subject.percentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="plnr-progress-track">
+                    <div className="plnr-progress-fill" style={{ width: `${subject.percentage}%`, backgroundColor: subject.color }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>우선순위 점수: {subject.score}점</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="plnr-info-box">
+              <strong>점수 계산 방식</strong><br />
+              · 기본 점수: {BASE_SCORE}점 · 수학 보너스: +{MATH_BONUS}점<br />
+              · 취약 과목: +{WEAK_WEIGHT}점 · 집중 관리: +{FOCUS_WEIGHT}점<br />
+              · 사용자 지정 가중치: 0~20점
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function toDateInputValue(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function CalendarPanel({ subjects, scores }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [studySessions, setStudySessions] = useState([]);
+
+  const [examDate, setExamDate] = useState('');
+  const [weekdayHours, setWeekdayHours] = useState([4, 2, 2, 2, 2, 2, 4]);
+  const [isSetupOpen, setIsSetupOpen] = useState(true);
+  const [showGuide, setShowGuide] = useState(true);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [planTotalHours, setPlanTotalHours] = useState(0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const examDateObj = examDate ? new Date(examDate + 'T00:00:00') : null;
+  const hasPlan = !!examDateObj && examDateObj > today;
+
+  const getStudyDays = () => {
+    if (!examDateObj) return [];
+    const list = [];
+    const cur = new Date(today);
+    while (cur < examDateObj) {
+      list.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return list;
+  };
+  const studyDays = hasPlan ? getStudyDays() : [];
+  const totalAvailableHours = studyDays.reduce((sum, d) => sum + (weekdayHours[d.getDay()] || 0), 0);
+  const daysUntilExam = examDateObj ? Math.ceil((examDateObj.getTime() - today.getTime()) / 86400000) : 0;
+
+  const isStudyDay = (date) => hasPlan && date && date >= today && date < examDateObj;
+  const isExamDay = (date) => hasPlan && date && isSameDay(date, examDateObj);
+
+  const loggedMinutesBySubject = useMemo(() => {
+    const map = {};
+    studySessions.forEach(s => { map[s.subjectName] = (map[s.subjectName] || 0) + s.duration; });
+    return map;
+  }, [studySessions]);
+
+  const subjectStats = useMemo(() => {
+    if (!hasPlan || scores.length === 0) return [];
+    return scores.map(s => {
+      const targetHours = (s.percentage / 100) * planTotalHours;
+      const loggedHours = (loggedMinutesBySubject[s.name] || 0) / 60;
+      const remainingNeed = Math.max(0, targetHours - loggedHours);
+      return { name: s.name, color: s.color, percentage: s.percentage, targetHours, loggedHours, remainingNeed };
+    });
+  }, [hasPlan, scores, planTotalHours, loggedMinutesBySubject]);
+
+  const adjustedWeights = useMemo(() => {
+    if (subjectStats.length === 0) return [];
+    const needSum = subjectStats.reduce((sum, s) => sum + s.remainingNeed, 0);
+    if (needSum <= 0) return subjectStats.map(s => ({ name: s.name, color: s.color, weight: s.percentage / 100 }));
+    return subjectStats.map(s => ({ name: s.name, color: s.color, weight: s.remainingNeed / needSum }));
+  }, [subjectStats]);
+
+  const dailyPlan = useMemo(() => {
+    const map = {};
+    const active = adjustedWeights.filter(w => w.weight > 0);
+    if (!hasPlan || active.length === 0 || studyDays.length === 0) return map;
+    const subjectsPerDay = Math.max(1, Math.ceil(active.length / 2));
+    const credits = {};
+    active.forEach(w => { credits[w.name] = 0; });
+    studyDays.forEach(day => {
+      active.forEach(w => { credits[w.name] += w.weight; });
+      const ranked = [...active].sort((a, b) => credits[b.name] - credits[a.name]);
+      const chosen = ranked.slice(0, subjectsPerDay);
+      const chosenWeightSum = chosen.reduce((sum, c) => sum + c.weight, 0) || 1;
+      chosen.forEach(c => { credits[c.name] -= chosenWeightSum / chosen.length; });
+      const dayMinutes = (weekdayHours[day.getDay()] || 0) * 60;
+      map[toDateInputValue(day)] = chosen.map(c => ({
+        name: c.name, color: c.color,
+        minutes: Math.round(dayMinutes * (c.weight / chosenWeightSum)),
+      }));
+    });
+    return map;
+  }, [hasPlan, adjustedWeights, studyDays, weekdayHours]);
+
+  const getDailyPlanForDate = (date) => date ? (dailyPlan[toDateInputValue(date)] || []) : [];
+  const getDailyRecommendedMinutes = (date, name) => {
+    const found = getDailyPlanForDate(date).find(e => e.name === name);
+    return found ? found.minutes : 0;
+  };
+  const getDailyTotalHours = (date) => (hasPlan && date) ? (weekdayHours[date.getDay()] || 0) : 0;
+
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear(), month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days = [];
+    for (let i = 0; i < firstDay.getDay(); i++) days.push(null);
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
+    return days;
+  };
+
+  const getSessionsForDate = (date) => date ? studySessions.filter(s => isSameDay(s.date, date)) : [];
+  const getTotalHoursForDate = (date) => getSessionsForDate(date).reduce((sum, s) => sum + s.duration, 0) / 60;
+  const removeSession = (id) => setStudySessions(studySessions.filter(s => s.id !== id));
+
+  const getTodayStats = () => {
+    return subjects.map(subject => {
+      const totalMinutes = studySessions
+        .filter(s => s.subjectName === subject.name && isSameDay(s.date, today))
+        .reduce((sum, s) => sum + s.duration, 0);
+      const recommendedMinutes = getDailyRecommendedMinutes(today, subject.name);
+      return { name: subject.name, hours: totalMinutes / 60, recommendedHours: recommendedMinutes / 60 };
+    }).filter(s => s.hours > 0 || s.recommendedHours > 0);
+  };
+
+  const days = getDaysInMonth(currentDate);
+  const todayStats = hasPlan ? getTodayStats() : [];
+  const previousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+  const updateWeekdayHour = (idx, val) => {
+    const next = [...weekdayHours];
+    next[idx] = Math.max(0, parseFloat(val) || 0);
+    setWeekdayHours(next);
+  };
+
+  const confirmSetup = () => {
+    if (!examDate || scores.length === 0) return;
+    const total = getStudyDays().reduce((sum, d) => sum + (weekdayHours[d.getDay()] || 0), 0);
+    setPlanTotalHours(total);
+    setIsSetupOpen(false);
+    setShowGuide(false);
+  };
+
+  // ── 타이머: Date.now() 기반으로 경과시간 계산 ──
+  const [timerSubject, setTimerSubject] = useState('');
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [toast, setToast] = useState(null);
+  const startTimestampRef = useRef(null);
+  const timerIntervalRef = useRef(null);
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (timerRunning) {
+      startTimestampRef.current = Date.now();
+      timerIntervalRef.current = setInterval(() => {
+        setTimerSeconds(Math.floor((Date.now() - startTimestampRef.current!) / 1000));
+      }, 500);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
+  }, [timerRunning]);
+
+  // 탭이 백그라운드로 전환될 때 자동저장하고 정지
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && timerRunning) {
+        const elapsed = startTimestampRef.current ? Math.floor((Date.now() - startTimestampRef.current) / 1000) : timerSeconds;
+        commitSession(timerSubject, elapsed);
+        setTimerRunning(false);
+        setTimerSeconds(0);
+        setTimerSubject('');
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [timerRunning, timerSubject, timerSeconds]);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 2400);
+  };
+
+  const formatTimer = (totalSeconds) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  };
+
+  const commitSession = (subject, seconds) => {
+    if (!subject || seconds < 10) return;
+    const scoreData = scores.find(s => s.name === subject);
+    const minutes = Math.max(1, Math.round(seconds / 60));
+    const saveDate = new Date(today);
+    setStudySessions(prev => [...prev, {
+      id: Date.now().toString(),
+      subjectName: subject,
+      duration: minutes,
+      date: saveDate,
+      color: scoreData?.color || '#1a2744',
+    }]);
+    showToast(`✓ ${subject} ${minutes}분 기록됐어요`);
+  };
+
+  const startTimer = () => { if (timerSubject) setTimerRunning(true); };
+
+  const stopTimer = () => {
+    const elapsed = startTimestampRef.current ? Math.floor((Date.now() - startTimestampRef.current) / 1000) : timerSeconds;
+    setTimerRunning(false);
+    commitSession(timerSubject, elapsed);
+    setTimerSeconds(0);
+    setTimerSubject('');
+  };
+
+  const resetTimer = () => {
+    setTimerRunning(false);
+    setTimerSeconds(0);
+    setTimerSubject('');
+  };
+
+  // 과목 전환: 현재 시간 저장 후 새 과목으로 즉시 시작
+  const switchSubject = (newSubject) => {
+    if (newSubject === timerSubject) return;
+    const elapsed = startTimestampRef.current ? Math.floor((Date.now() - startTimestampRef.current) / 1000) : timerSeconds;
+    commitSession(timerSubject, elapsed);
+    setTimerSeconds(0);
+    setTimerSubject(newSubject);
+    // startTimestampRef는 timerRunning이 유지되므로 다음 interval tick에서 재설정됨
+    startTimestampRef.current = Date.now();
+  };
+
+  const todayLoggedMinutes = useMemo(() => {
+    return studySessions.filter(s => isSameDay(s.date, today)).reduce((sum, s) => sum + s.duration, 0);
+  }, [studySessions]);
+
+  const minSelectableDate = toDateInputValue(new Date(today.getTime() + 86400000));
+
+  return (
+    <div className="plnr-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <div className="plnr-card-header" style={{ marginBottom: 0, border: 'none', paddingBottom: 0 }}>
+          <CalendarIcon size={18} /> 학습 계획 달력
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button onClick={() => setShowGuide(!showGuide)} className="plnr-guide-link">
+            {showGuide ? '이용 방법 숨기기' : '❔ 이용 방법'}
+          </button>
+          {hasPlan && !isSetupOpen && (
+            <button onClick={() => setIsSetupOpen(true)} className="plnr-btn-gold">시험 설정 변경</button>
+          )}
+        </div>
+      </div>
+
+      <div className="plnr-timer-card">
+        <div className="plnr-timer-inner">
+          <div className="plnr-timer-title">
+            {timerRunning && <span className="plnr-timer-live-dot" />}
+            {timerRunning ? `${timerSubject} 공부 중` : '학습 타이머'}
+          </div>
+
+          {!timerRunning && (
+            <select
+              value={timerSubject}
+              onChange={(e) => setTimerSubject(e.target.value)}
+              className="plnr-timer-select"
+            >
+              <option value="">과목을 선택하세요</option>
+              {subjects.map(subject => <option key={subject.id} value={subject.name}>{subject.name}</option>)}
+            </select>
+          )}
+
+          <div className="plnr-timer-display">{formatTimer(timerSeconds)}</div>
+
+          {timerSubject && hasPlan && isStudyDay(today) && (
+            <div className="plnr-timer-rec">
+              오늘 '{timerSubject}' 추천: {getDailyRecommendedMinutes(today, timerSubject) > 0 ? `${getDailyRecommendedMinutes(today, timerSubject)}분` : '오늘은 다른 과목 위주 추천'}
+            </div>
+          )}
+
+          <div className="plnr-timer-btns">
+            {!timerRunning && (
+              <button onClick={startTimer} disabled={!timerSubject} className="plnr-timer-btn start">▶ 시작</button>
+            )}
+            {timerRunning && (
+              <button onClick={stopTimer} className="plnr-timer-btn stop">■ 종료 · 기록</button>
+            )}
+            {timerRunning && (
+              <button onClick={resetTimer} className="plnr-timer-btn reset">초기화</button>
+            )}
+          </div>
+
+          {timerRunning && subjects.length > 1 && (
+            <div className="plnr-switch-row">
+              <div style={{ width: '100%', textAlign: 'center' }}>
+                <div className="plnr-switch-label">과목 전환 (현재 시간 자동 저장)</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {subjects.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => switchSubject(s.name)}
+                      className={`plnr-switch-chip ${s.name === timerSubject ? 'active' : ''}`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="plnr-timer-today">
+            오늘 누적 학습 기록 <strong>{Math.floor(todayLoggedMinutes / 60)}시간 {todayLoggedMinutes % 60}분</strong>
+            {timerRunning && <span> (+ 진행 중)</span>}
+          </div>
+        </div>
+      </div>
+
+      {toast && <div className="plnr-toast">{toast}</div>}
+
+      {showGuide && (
+        <div className="plnr-guide-card">
+          <div className="plnr-guide-title">💡 이렇게 사용해보세요</div>
+          <div className="plnr-guide-step">
+            <span className="plnr-guide-num">1</span>
+            <span>'과목관리' 탭에서 과목을 추가하고 취약·집중 과목을 표시한 뒤 <strong>우선순위 계산하기</strong>를 눌러주세요.</span>
+          </div>
+          <div className="plnr-guide-step">
+            <span className="plnr-guide-num">2</span>
+            <span>아래에서 <strong>시험 날짜</strong>와 <strong>요일별로 공부 가능한 시간</strong>을 입력해주세요.</span>
+          </div>
+          <div className="plnr-guide-step">
+            <span className="plnr-guide-num">3</span>
+            <span>타이머로 공부하면 자동 기록돼요. 과목 전환 버튼으로 중간에 바꿀 수도 있어요.</span>
+          </div>
+          <div className="plnr-guide-step">
+            <span className="plnr-guide-num">4</span>
+            <span>탭을 벗어나면 그 시점까지 공부한 시간이 자동으로 저장돼요.</span>
+          </div>
+          <div className="plnr-guide-step">
+            <span className="plnr-guide-num">5</span>
+            <span>계획보다 밀린 과목이 생기면, 남은 기간 동안 그 과목에 자동으로 더 많은 시간이 배정돼요.</span>
+          </div>
+        </div>
+      )}
+
+      {isSetupOpen ? (
+        <div className="plnr-add-panel" style={{ marginBottom: 24 }}>
+          <div className="plnr-setup-row">
+            <label className="plnr-setup-label">시험 날짜</label>
+            <input
+              type="date"
+              value={examDate}
+              min={minSelectableDate}
+              onChange={(e) => setExamDate(e.target.value)}
+              className="plnr-input"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div className="plnr-setup-row" style={{ marginBottom: 8 }}>
+            <label className="plnr-setup-label">요일별 공부 가능 시간</label>
+            <div className="plnr-weekday-grid">
+              {WEEKDAYS.map((wd, idx) => (
+                <div key={wd} className={`plnr-weekday-input-item ${(idx === 0 || idx === 6) ? 'weekend' : ''}`}>
+                  <label>{wd}</label>
+                  <input
+                    type="number" min="0" max="24" step="0.5"
+                    value={weekdayHours[idx]}
+                    onChange={(e) => updateWeekdayHour(idx, e.target.value)}
+                  />
+                  <div className="plnr-weekday-unit">시간</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {scores.length === 0 && (
+            <div className="plnr-info-box">⚠️ 먼저 '과목관리' 탭에서 과목을 추가하고 우선순위를 계산해주세요.</div>
+          )}
+          <button onClick={confirmSetup} disabled={!examDate || scores.length === 0} className="plnr-btn-primary full" style={{ marginTop: 20 }}>
+            학습 계획 만들기
+          </button>
+        </div>
+      ) : (
+        hasPlan && (
+          <>
+            <div className="plnr-dday-banner">
+              <div className="plnr-dday-main">
+                <span className="plnr-dday-num">D-{daysUntilExam}</span>
+                <span className="plnr-dday-label">{formatDate(examDateObj)} 시험까지</span>
+              </div>
+              <div className="plnr-dday-total">
+                남은 공부 가능 시간<br /><strong>{totalAvailableHours.toFixed(1)}시간</strong>
+              </div>
+            </div>
+            <button onClick={() => setShowBreakdown(!showBreakdown)} className="plnr-btn-gold" style={{ marginBottom: 16 }}>
+              {showBreakdown ? '과목별 배분 숨기기' : '과목별 배분 보기'}
+            </button>
+            {showBreakdown && (
+              <div style={{ background: 'var(--cream-mid)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                {subjectStats.map((s, index) => (
+                  <div key={index} className="plnr-rec-swatch-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: s.color }} />
+                      <span style={{ fontWeight: 600 }}>{s.name}</span>
+                    </div>
+                    <span style={{ color: 'var(--muted)' }}>
+                      {s.loggedHours.toFixed(1)}h / {s.targetHours.toFixed(1)}h
+                      {s.remainingNeed > 0
+                        ? <span style={{ color: 'var(--gold)', marginLeft: 6, fontWeight: 700 }}>(밀림 {s.remainingNeed.toFixed(1)}h)</span>
+                        : <span style={{ color: 'var(--navy-light)', marginLeft: 6, fontWeight: 700 }}>✓ 완료</span>}
+                    </span>
+                  </div>
+                ))}
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
+                  💡 계획보다 밀린 과목은 남은 기간에 자동으로 더 많은 시간이 배정돼요.
+                </div>
+              </div>
+            )}
+          </>
+        )
+      )}
+
+      <div className="plnr-cal-controls">
+        <button onClick={previousMonth} className="plnr-cal-nav-btn">←</button>
+        <span className="plnr-cal-month">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</span>
+        <button onClick={nextMonth} className="plnr-cal-nav-btn">→</button>
+      </div>
+
+      <div className="plnr-weekday-row">
+        {WEEKDAYS.map(day => <div key={day} className="plnr-weekday-label">{day}</div>)}
+      </div>
+      <div className="plnr-day-grid">
+        {days.map((day, index) => {
+          const sessions = getSessionsForDate(day);
+          const totalHours = getTotalHoursForDate(day);
+          const isSelected = day && selectedDate && isSameDay(day, selectedDate);
+          const isToday = day && isSameDay(day, new Date());
+          const studyDay = isStudyDay(day);
+          const examDay = isExamDay(day);
+          const outside = hasPlan && day && !studyDay && !examDay;
+          return (
+            <div
+              key={index}
+              onClick={() => day && setSelectedDate(day)}
+              className={`plnr-day-cell ${!day ? 'empty' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${examDay ? 'exam' : ''} ${outside ? 'outside' : ''}`}
+            >
+              {day && (
+                <>
+                  <div className={`plnr-day-num ${isToday ? 'today' : ''}`}>{day.getDate()}</div>
+                  {examDay && <div className="plnr-exam-flag">🎯 시험일</div>}
+                  {studyDay && getDailyPlanForDate(day).length > 0 && (
+                    <div className="plnr-rec-strip">
+                      {getDailyPlanForDate(day).map((e, i) => <div key={i} style={{ flexGrow: e.minutes || 1, backgroundColor: e.color }} />)}
+                    </div>
+                  )}
+                  {sessions.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      {sessions.slice(0, 2).map(session => (
+                        <div key={session.id} className="plnr-session-tag" style={{ backgroundColor: session.color + '1f', color: session.color }}>
+                          {session.subjectName}
+                        </div>
+                      ))}
+                      {sessions.length > 2 && <div style={{ fontSize: 10, color: 'var(--muted)' }}>+{sessions.length - 2}</div>}
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                        <Clock size={10} /> {totalHours.toFixed(1)}h
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedDate && (
+        <div>
+          <div className="plnr-detail-header">{formatDate(selectedDate)}</div>
+
+          {isStudyDay(selectedDate) && getDailyPlanForDate(selectedDate).length > 0 && (
+            <div style={{ background: 'var(--cream-mid)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, color: 'var(--navy)', marginBottom: 8, fontSize: 13 }}>
+                이 날 추천 학습 배분 (총 {getDailyTotalHours(selectedDate).toFixed(1)}시간)
+              </div>
+              {getDailyPlanForDate(selectedDate).map((e, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: e.color, display: 'inline-block' }} />
+                    {e.name}
+                  </span>
+                  <span style={{ color: 'var(--muted)' }}>{e.minutes}분</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>오늘은 이 과목들에 집중하는 날이에요. 나머지 과목은 다른 날 배정돼요.</div>
+            </div>
+          )}
+
+          {isExamDay(selectedDate) && (
+            <div className="plnr-info-box">🎯 시험 날이에요! 무리한 학습보다는 가벼운 마무리 점검을 추천해요.</div>
+          )}
+
+          {getSessionsForDate(selectedDate).map(session => (
+            <div key={session.id} className="plnr-session-row" style={{ backgroundColor: session.color + '12' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: session.color }} />
+                <span style={{ fontWeight: 600 }}>{session.subjectName}</span>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>{session.duration}분</span>
+              </div>
+              <button onClick={() => removeSession(session.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}>
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+
+          {getSessionsForDate(selectedDate).length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--muted)', padding: '12px 0' }}>이 날 기록된 학습이 없어요. 타이머로 공부하면 자동으로 여기에 쌓여요.</div>
+          )}
+        </div>
+      )}
+
+      {hasPlan && todayStats.length > 0 && (
+        <div style={{ marginTop: 24, paddingTop: 20, borderTop: '2px solid var(--cream-dark)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Noto Serif KR', serif", fontWeight: 700, color: 'var(--navy)', marginBottom: 14 }}>
+            <TrendingUp size={17} /> 오늘 하루 달성도
+          </div>
+          {todayStats.map((stat, index) => {
+            const recommended = stat.recommendedHours;
+            const percentage = recommended > 0 ? (stat.hours / recommended) * 100 : (stat.hours > 0 ? 100 : 0);
+            return (
+              <div key={index} className="plnr-weekly-row">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600 }}>{stat.name}</span>
+                  <span style={{ color: 'var(--muted)' }}>
+                    {stat.hours.toFixed(1)}h / {recommended.toFixed(1)}h
+                    <span style={{ marginLeft: 8, color: percentage >= 100 ? 'var(--gold)' : 'var(--navy-light)', fontWeight: 700 }}>
+                      ({percentage.toFixed(0)}%)
+                    </span>
+                  </span>
+                </div>
+                <div className="plnr-progress-track">
+                  <div className="plnr-progress-fill" style={{ width: `${Math.min(percentage, 100)}%`, backgroundColor: percentage >= 100 ? 'var(--gold)' : 'var(--navy-light)' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [subjects, setSubjects] = useState([]);
+  const [scores, setScores] = useState([]);
+  const [tab, setTab] = useState('manage');
+
+  return (
+    <div className="plnr-root">
+      <ThemeStyles />
+
+      <div className="plnr-hero">
+        <div className="plnr-hero-inner">
+          <div className="plnr-badge">STUDY PLANNER</div>
+          <h1 className="plnr-title">
+            <span className="accent">시험공부</span> 플래너
+          </h1>
+          <p className="plnr-sub">과목별 우선순위를 정하면<br />너에게 맞는 학습 비율과 계획을 만들어줄게</p>
+        </div>
+      </div>
+
+      <div className="plnr-container">
+        {tab === 'manage'
+          ? <ManagePanel subjects={subjects} setSubjects={setSubjects} scores={scores} setScores={setScores} />
+          : <CalendarPanel subjects={subjects} scores={scores} />
+        }
+      </div>
+
+      <div className="plnr-nav">
+        <div className={`plnr-nav-item ${tab === 'manage' ? 'active' : ''}`} onClick={() => setTab('manage')}>
+          <div className="plnr-nav-emoji">📖</div>
+          <div>과목관리</div>
+        </div>
+        <div className={`plnr-nav-item ${tab === 'calendar' ? 'active' : ''}`} onClick={() => setTab('calendar')}>
+          <div className="plnr-nav-emoji">📅</div>
+          <div>학습달력</div>
+        </div>
+      </div>
+    </div>
+  );
+}
