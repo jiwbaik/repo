@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>잠실고등학교 학습 도우미 : JAMSILI</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&family=Gmarket+Sans:wght@300;500;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --cream: #faf6ef;
+      --cream-dark: #f0e9dc;
+      --cream-mid: #f5f0e8;
+      --navy: #1a2744;
+      --navy-mid: #243257;
+      --navy-light: #2e4070;
+      --gold: #b8973a;
+      --gold-light: #d4af60;
+      --text: #1a2744;
+      --muted: #6b7280;
+      --white: #ffffff;
+      --border: rgba(26, 39, 68, 0.12);
+      --radius: 16px;
+      --shadow: 0 4px 24px rgba(26, 39, 68, 0.10);
+      --shadow-lg: 0 12px 48px rgba(26, 39, 68, 0.16);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .page {
+      display: none;
+      min-height: 100vh;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* HOME */
+    #home {
+      background: var(--cream);
+    }
+
+    .home-hero {
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 55%, var(--navy-light) 100%);
+      padding: 80px 24px 64px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .home-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 20% 80%, rgba(184, 151, 58, .18) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(184, 151, 58, .10) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .home-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .home-badge {
+      display: inline-block;
+      border: 1px solid rgba(184, 151, 58, .5);
+      color: var(--gold-light);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 6px 18px;
+      border-radius: 999px;
+      margin-bottom: 28px;
+      animation: fadeDown .6s ease both;
+    }
+
+    .home-title {
+      font-family: 'Noto Serif KR', serif;
+      font-size: clamp(26px, 6vw, 50px);
+      font-weight: 700;
+      color: var(--cream);
+      line-height: 1.25;
+      margin-bottom: 18px;
+      animation: fadeDown .7s .1s ease both;
+    }
+
+    .home-title span {
+      background: linear-gradient(135deg, var(--gold-light), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .home-sub {
+      font-size: 15px;
+      color: rgba(250, 246, 239, .7);
+      margin-bottom: 52px;
+      animation: fadeDown .7s .2s ease both;
+    }
+
+    .home-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+      max-width: 760px;
+      margin: 0 auto;
+      animation: fadeDown .7s .3s ease both;
+    }
+
+    .home-card {
+      background: rgba(250, 246, 239, .07);
+      border: 1px solid rgba(184, 151, 58, .25);
+      border-radius: var(--radius);
+      padding: 26px 22px;
+      cursor: pointer;
+      text-align: left;
+      transition: all .3s cubic-bezier(.34, 1.56, .64, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .home-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(184, 151, 58, .12), transparent);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+
+    .home-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      border-color: var(--gold);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, .3);
+    }
+
+    .home-card:hover::before {
+      opacity: 1;
+    }
+
+    .home-card:active {
+      transform: translateY(-2px) scale(.99);
+    }
+
+    .card-emoji {
+      font-size: 30px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .card-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--gold-light);
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .card-title {
+      font-family: 'Gmarket Sans', sans-serif;
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--cream);
+      margin-bottom: 7px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: rgba(250, 246, 239, .55);
+      line-height: 1.6;
+    }
+
+    .card-arrow {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      color: var(--gold);
+      font-size: 15px;
+      opacity: .5;
+      transition: all .2s;
+    }
+
+    .home-card:hover .card-arrow {
+      opacity: 1;
+      transform: translate(3px, -3px);
+    }
+
+    /* FAB + MODAL */
+    .faq-fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--navy);
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      z-index: 999;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, .2);
+      transition: all .2s;
+      font-family: 'Noto Sans KR', sans-serif;
+      display: none;
+    }
+
+    .faq-fab:hover {
+      background: var(--navy-mid);
+      transform: translateY(-2px);
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--cream);
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 460px;
+      padding: 28px;
+      box-shadow: var(--shadow-lg);
+      animation: fadeUp .3s ease;
+    }
+
+    .modal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-title {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    .modal-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .modal-textarea {
+      width: 100%;
+      height: 120px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      background: var(--white);
+      transition: border-color .2s;
+    }
+
+    .modal-textarea:focus {
+      border-color: var(--navy);
+    }
+
+    .modal-submit {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      background: var(--navy);
+      color: var(--cream);
+      border: none;
+      border-radius: 10px;
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .modal-submit:hover {
+      background: var(--navy-mid);
+    }
+
+    /* APP LAYOUT (사이드바 + iframe 콘텐츠) */
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 215px;
+      flex-shrink: 0;
+      background: var(--navy);
+      padding: 26px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold-light);
+      padding: 0 8px 18px;
+      border-bottom: 1px solid rgba(184, 151, 58, .2);
+      margin-bottom: 10px;
+      line-height: 1.6;
+      cursor: pointer;
+      transition: opacity .2s;
+    }
+
+    .sidebar-logo:hover {
+      opacity: .8;
+    }
+
+    .sb-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: rgba(250, 246, 239, .6);
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: all .2s;
+      width: 100%;
+    }
+
+    .sb-btn:hover {
+      background: rgba(250, 246, 239, .08);
+      color: var(--cream);
+    }
+
+    .sb-btn.active {
+      background: rgba(184, 151, 58, .18);
+      color: var(--gold-light);
+    }
+
+    .sb-home {
+      margin-top: auto;
+      padding-top: 18px;
+      border-top: 1px solid rgba(184, 151, 58, .2);
+    }
+
+    .app-content {
+      flex: 1;
+      overflow: hidden;
+      background: var(--cream);
+    }
+
+    .app-content iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* 애니메이션 */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 반응형 */
+    @media (max-width: 768px) {
+      .home-cards {
+        grid-template-columns: 1fr;
+      }
+
+      .app-layout {
+        flex-direction: column;
+        height: auto;
+      }
+
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: static;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HOME -->
+  <div id="home" class="page active">
+    <div class="home-hero">
+      <div class="home-inner">
+        <div class="home-badge">JAMSIL HIGH SCHOOL · 2026</div>
+        <h1 class="home-title">잠실고등학교<br>학습 도우미<br><span>JAMSILI</span></h1>
+        <p class="home-sub">잠실고등학교 학생들의 학업 생활을 도와드립니다.</p>
+        <div class="home-cards">
+          <div class="home-card" onclick="goTo('saenggibu')">
+            <span class="card-emoji">📋</span>
+            <div class="card-label">RECORD</div>
+            <div class="card-title">생기부 추천</div>
+            <div class="card-desc">계열별 도서, 활동, 잠실고 특별 프로그램 안내</div>
+            <span class="card-arrow">↗</span>
+          </div>
+          <div class="home-card" onclick="goTo('consult')">
+            <span class="card-emoji">💬</span>
+            <div class="card-label">AI CONSULT</div>
+            <div class="card-title">선택과목 상담</div>
+            <div class="card-desc">AI가 진로에 맞는 다음 학년 선택과목을 추천해드려요.</div>
+            <span class="card-arrow">↗</span>
+          </div>
+          <div class="home-card" onclick="goTo('habit')">
+            <span class="card-emoji">🗺️</span>
+            <div class="card-label">HABIT MAP</div>
+            <div class="card-title">습관지도</div>
+            <div class="card-desc">막다른 길에서 헤매지 않도록, 나만의 공부 루틴을 지도로 기록해요.</div>
+            <span class="card-arrow">↗</span>
+          </div>
+          <div class="home-card" onclick="goTo('studypack')">
+            <span class="card-emoji">📊</span>
+            <div class="card-label">STUDY PLANNER</div>
+            <div class="card-title">시험공부 플래너</div>
+            <div class="card-desc">잠실고 시험 일정에 맞춘 맞춤형 학습 계획</div>
+            <span class="card-arrow">↗</span>
+          </div>
+        </div>
+
+        <!-- 제작동기 버튼 -->
+        <div style="margin-top:28px;animation:fadeDown .7s .4s ease both;">
+          <button onclick="openMotivation()" style="background:transparent;border:1px solid rgba(184,151,58,.4);color:rgba(250,246,239,.65);font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:500;padding:10px 26px;border-radius:999px;cursor:pointer;transition:all .3s;letter-spacing:.5px;">
+            💡 이 앱을 만든 이유
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 제작동기 모달 -->
+  <div class="modal-overlay" id="motivationModal" onclick="if(event.target===this)closeMotivation()">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-top">
+        <div class="modal-title">💡 제작 동기</div>
+        <button class="modal-close" onclick="closeMotivation()">×</button>
+      </div>
+      <div style="font-size:14px;color:var(--text);line-height:1.9;padding:8px 0;">
+        <p style="line-height:1.9;margin-bottom:14px;">학업 계획이나 공부 습관을 잡아주는 앱, 생기부 요령이나 선택과목을 알려주는 사이트는 많이 있습니다. 하지만 우리 학교에 정확하게 맞는 내용이 아니라서 잘 이해가 안 되고, 내용이 별로 필요 없는 경우가 있었습니다.</p>
+        <p style="line-height:1.9;">그래서 자신의 전공 분야를 입력하면 <strong>잠실고등학교 과목에 맞게 선택과목을 추천</strong>해주고, <strong>학교 시험 일정에 따라 공부 계획을 짜주는</strong> 맞춤형 공부 도우미 앱을 만들고 싶어 이 프로그램을 만들게 되었습니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 생기부 추천 -->
+  <div id="saenggibu" class="page">
+    <div class="app-layout">
+      <nav class="sidebar">
+        <div class="sidebar-logo" onclick="resetOtherAppsAndGoHome()" role="button" tabindex="0" title="처음 시작화면으로 돌아가기" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetOtherAppsAndGoHome();}">🏫 JAMSILI<br>잠실고 학습 도우미</div>
+        <button class="sb-btn active" onclick="goTo('saenggibu')">📋 생기부 추천</button>
+        <button class="sb-btn" onclick="goTo('consult')">💬 선택과목 상담</button>
+        <button class="sb-btn" onclick="goTo('habit')">🗺️ 습관지도</button>
+        <button class="sb-btn" onclick="goTo('studypack')">📊 시험공부 플래너</button>
+        <div class="sb-home"><button class="sb-btn" onclick="goTo('home')">🏠 홈으로</button></div>
+      </nav>
+      <div class="app-content">
+        <iframe src="생기부_추천/html/index.html" title="생기부 추천" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- 선택과목 상담 -->
+  <div id="consult" class="page">
+    <div class="app-layout">
+      <nav class="sidebar">
+        <div class="sidebar-logo" onclick="resetOtherAppsAndGoHome()" role="button" tabindex="0" title="처음 시작화면으로 돌아가기" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetOtherAppsAndGoHome();}">🏫 JAMSILI<br>잠실고 학습 도우미</div>
+        <button class="sb-btn" onclick="goTo('saenggibu')">📋 생기부 추천</button>
+        <button class="sb-btn active" onclick="goTo('consult')">💬 선택과목 상담</button>
+        <button class="sb-btn" onclick="goTo('habit')">🗺️ 습관지도</button>
+        <button class="sb-btn" onclick="goTo('studypack')">📊 시험공부 플래너</button>
+        <div class="sb-home"><button class="sb-btn" onclick="goTo('home')">🏠 홈으로</button></div>
+      </nav>
+      <div class="app-content">
+        <iframe id="frame-consult" src="선택과목_상담/html/index.html" title="선택과목 상담" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- 습관지도 -->
+  <div id="habit" class="page">
+    <div class="app-layout">
+      <nav class="sidebar">
+        <div class="sidebar-logo" onclick="resetOtherAppsAndGoHome()" role="button" tabindex="0" title="처음 시작화면으로 돌아가기" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetOtherAppsAndGoHome();}">🏫 JAMSILI<br>잠실고 학습 도우미</div>
+        <button class="sb-btn" onclick="goTo('saenggibu')">📋 생기부 추천</button>
+        <button class="sb-btn" onclick="goTo('consult')">💬 선택과목 상담</button>
+        <button class="sb-btn active" onclick="goTo('habit')">🗺️ 습관지도</button>
+        <button class="sb-btn" onclick="goTo('studypack')">📊 시험공부 플래너</button>
+        <div class="sb-home"><button class="sb-btn" onclick="goTo('home')">🏠 홈으로</button></div>
+      </nav>
+      <div class="app-content">
+        <iframe id="frame-habit" src="습관지도/html/index.html" title="습관지도" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시험공부 플래너 -->
+  <div id="studypack" class="page">
+    <div class="app-layout">
+      <nav class="sidebar">
+        <div class="sidebar-logo" onclick="resetOtherAppsAndGoHome()" role="button" tabindex="0" title="처음 시작화면으로 돌아가기" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();resetOtherAppsAndGoHome();}">🏫 JAMSILI<br>잠실고 학습 도우미</div>
+        <button class="sb-btn" onclick="goTo('saenggibu')">📋 생기부 추천</button>
+        <button class="sb-btn" onclick="goTo('consult')">💬 선택과목 상담</button>
+        <button class="sb-btn" onclick="goTo('habit')">🗺️ 습관지도</button>
+        <button class="sb-btn active" onclick="goTo('studypack')">📊 시험공부 플래너</button>
+        <div class="sb-home"><button class="sb-btn" onclick="goTo('home')">🏠 홈으로</button></div>
+      </nav>
+      <div class="app-content">
+        <iframe id="frame-studypack" src="시험공부_플래너/html/index.html" title="시험공부 플래너" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ FAB -->
+  <button class="faq-fab" id="faqFab" onclick="openModal()">✉ 문의사항</button>
+  <div class="modal-overlay" id="faqModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <div class="modal-top">
+        <div class="modal-title">✉ 문의사항</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <p class="modal-desc">문의사항이나 문제가 있다면 말씀해주세요</p>
+      <input type="text" id="faqName" placeholder="이름 (선택사항)" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-family:'Noto Sans KR',sans-serif;font-size:13px;outline:none;background:var(--white);margin-bottom:10px;"/>
+      <textarea class="modal-textarea" id="faqText" placeholder="내용을 입력해주세요..."></textarea>
+      <button class="modal-submit" onclick="submitFaq()">제출하기</button>
+    </div>
+  </div>
+
+  <script>
+    // ── 페이지 전환
+    function goTo(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
+      const fab = document.getElementById('faqFab');
+      if (fab) fab.style.display = id === 'home' ? 'none' : 'block';
+    }
+
+    // ── 로고 클릭: 처음 시작화면으로 돌아가면서, 생기부 추천·문의사항을 뺀
+    // 나머지(선택과목 상담·습관지도·시험공부 플래너)는 처음 상태로 되돌림
+    // (각 iframe을 새로고침 — localStorage에 저장된 내용은 지워지지 않고,
+    //  현재 진행 중이던 대화·설정·화면 위치 등만 초기화됨)
+    function resetOtherAppsAndGoHome() {
+      ['frame-consult', 'frame-habit', 'frame-studypack'].forEach(function (id) {
+        var f = document.getElementById(id);
+        if (!f) return;
+        try {
+          f.contentWindow.location.reload();
+        } catch (e) {
+          // 동일 출처 접근이 막혀 새로고침이 안 되는 경우를 대비한 대체 방법
+          var src = f.getAttribute('src');
+          f.setAttribute('src', 'about:blank');
+          setTimeout(function () { f.setAttribute('src', src); }, 0);
+        }
+      });
+      goTo('home');
+    }
+
+    // ── 제작동기 모달
+    function openMotivation() { document.getElementById('motivationModal').classList.add('open'); }
+    function closeMotivation() { document.getElementById('motivationModal').classList.remove('open'); }
+
+    // ── 문의사항 모달
+    function openModal() { document.getElementById('faqModal').classList.add('open'); }
+    function closeModal() { document.getElementById('faqModal').classList.remove('open'); }
+    function submitFaq() {
+      const t = document.getElementById('faqText').value.trim();
+      const n = document.getElementById('faqName') ? document.getElementById('faqName').value.trim() : '';
+      if (!t) { alert('내용을 입력해주세요.'); return; }
+
+      // 이름 + 문의내용 합쳐서 전송
+      const msg = n ? `[${n}] ${t}` : t;
+      const encoded = encodeURIComponent(msg);
+      const formUrl = `https://docs.google.com/forms/d/e/1FAIpQLSesluk24XYteuBVQEp_4XftjoCLauZBS487HlTITuNPxjfiuw/viewform?usp=pp_url&entry.1982278013=${encoded}`;
+
+      window.open(formUrl, '_blank');
+
+      alert('문의 창이 열립니다. 내용을 확인하고 제출 버튼을 눌러주세요! 😊');
+      document.getElementById('faqText').value = '';
+      if (document.getElementById('faqName')) document.getElementById('faqName').value = '';
+      closeModal();
+    }
+  </script>
+</body>
+
+</html>
